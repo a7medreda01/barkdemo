@@ -197,7 +197,25 @@ async function fetchDuffel(endpoint: string, options: RequestInit = {}): Promise
 
   return json;
 }
+// Fetch ALL orders directly from Duffel (source of truth), handling pagination
+async function fetchAllDuffelOrders(): Promise<Record<string, unknown>[]> {
+  let allOrders: Record<string, unknown>[] = [];
+  let after: string | null = null;
 
+  do {
+    const params = new URLSearchParams({ limit: '50', sort: '-created_at' });
+    if (after) params.set('after', after);
+
+    const response = await fetchDuffel(`/air/orders?${params.toString()}`);
+    const pageData = (response['data'] || []) as Record<string, unknown>[];
+    allOrders = allOrders.concat(pageData);
+
+    const meta = response['meta'] as { after?: string | null } | undefined;
+    after = meta?.after || null;
+  } while (after);
+
+  return allOrders;
+}
 interface DuffelPassengerRaw {
   given_name: string;
   family_name: string;
@@ -788,13 +806,74 @@ app.post('/api/orders/instant', async (req, res) => {
 /**
  * 12. GET /api/orders
  */
-app.get('/api/orders', (req, res) => {
-  const user = getActiveUser(req);
-  // Return orders belonging to this user
-  const userOrders = orders.filter(o => o.user_id === user.id).sort((a, b) => b.created_at.localeCompare(a.created_at));
-  res.json(userOrders);
-});
+/**
+ * 12. GET /api/orders (current user's orders, sourced live from Duffel)
+ */
+/**
+ * 12. GET /api/orders (current user's orders, matched by passenger email, sourced live from Duffel)
+ */
+app.get('/api/orders', async (req, res) => {
+  try {
+    const user = getActiveUser(req);
+    const userEmail = user.email.toLowerCase().trim();
 
+    const duffelOrders = await fetchAllDuffelOrders();
+
+    const merged = duffelOrders
+      .map((d: any) => {
+        // Match order to this agent by comparing passenger email(s) with the agent's email
+        const passengers = (d.passengers || []) as { email?: string }[];
+        const belongsToUser = passengers.some(
+          p => (p.email || '').toLowerCase().trim() === userEmail
+        );
+        if (!belongsToUser) return null;
+
+        // Merge with local metadata if we still have it (receipt, markup, tickets)
+        const local = orders.find(o => o.id === d.id);
+
+        const markupPct = local?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
+        const duffelTotal = Number(d.total_amount || 0);
+        const officeMarkupAmt = local?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
+        const officeTotalAmt = local?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
+
+        const isPaid = !!d.payment_status?.paid_at;
+        const derivedStatus: 'awaiting_payment' | 'confirmed' | 'cancelled' =
+          local?.status === 'cancelled' ? 'cancelled' : (isPaid ? 'confirmed' : 'awaiting_payment');
+
+        const routeFromSlices = Array.isArray(d.slices) && d.slices.length > 0
+          ? d.slices.map((s: any) => `${s.origin?.iata_code || '?'} ➔ ${s.destination?.iata_code || '?'}`).join(' | ')
+          : 'Unknown Route';
+
+        return {
+          id: d.id,
+          booking_reference: d.booking_reference,
+          total_amount: d.total_amount,
+          total_currency: d.total_currency,
+          payment_status: isPaid ? 'paid' : 'awaiting_payment',
+          payment_required_by: d.payment_required_by || local?.payment_required_by || null,
+          passengers: d.passengers || [],
+          route: local?.route || routeFromSlices,
+          owner_name: d.owner?.name || local?.owner_name || 'Unknown Airline',
+          status: derivedStatus,
+          created_at: d.created_at || local?.created_at || new Date().toISOString(),
+          user_id: local?.user_id || user.id,
+          receipt_number: local?.receipt_number,
+          admin_review_status: local?.admin_review_status,
+          is_hold_booking: local?.is_hold_booking ?? true,
+          markup_percentage_at_booking: markupPct,
+          office_markup_amount: officeMarkupAmt,
+          office_total_amount: officeTotalAmt,
+          tickets: local?.tickets || [],
+        };
+      })
+      .filter((o): o is NonNullable<typeof o> => o !== null);
+
+    res.json(merged.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+  } catch (err: unknown) {
+    console.error('Error fetching user orders from Duffel:', err);
+    res.status(500).json({ error: 'فشل في جلب قائمة الحجوزات الخاصة بك.' });
+  }
+});
 /**
  * 12b. GET /api/orders/:order_id
  * Returns details for a single order, fetching live data from Duffel if possible, and merging with local data and markup calculations.
@@ -1171,8 +1250,68 @@ app.put('/api/settings/markup', (req, res) => {
 /**
  * 13. GET /api/admin/orders (returns all orders)
  */
-app.get('/api/admin/orders', (req, res) => {
-  res.json(orders.sort((a, b) => b.created_at.localeCompare(a.created_at)));
+/**
+ * 13. GET /api/admin/orders (returns all orders, sourced live from Duffel)
+ */
+app.get('/api/admin/orders', async (req, res) => {
+  try {
+    const duffelOrders = await fetchAllDuffelOrders();
+
+    const merged = duffelOrders.map((d: any) => {
+      // Match with local metadata (user_id, receipt info, markup, tickets) if we have it
+      const local = orders.find(o => o.id === d.id);
+
+      const markupPct = local?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
+      const duffelTotal = Number(d.total_amount || 0);
+      const officeMarkupAmt = local?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
+      const officeTotalAmt = local?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
+
+      // Derive status from Duffel's live payment_status object
+      const isPaid = !!d.payment_status?.paid_at;
+      const derivedStatus: 'awaiting_payment' | 'confirmed' | 'cancelled' =
+        local?.status === 'cancelled' ? 'cancelled' : (isPaid ? 'confirmed' : 'awaiting_payment');
+
+      // Build a readable route string from slices if we don't have one locally
+      const routeFromSlices = Array.isArray(d.slices) && d.slices.length > 0
+        ? d.slices.map((s: any) => `${s.origin?.iata_code || '?'} ➔ ${s.destination?.iata_code || '?'}`).join(' | ')
+        : 'Unknown Route';
+
+      return {
+        id: d.id,
+        booking_reference: d.booking_reference,
+        total_amount: d.total_amount,
+        total_currency: d.total_currency,
+        payment_status: isPaid ? 'paid' : 'awaiting_payment',
+        payment_required_by: d.payment_required_by || local?.payment_required_by || null,
+        passengers: d.passengers || [],
+        route: local?.route || routeFromSlices,
+        owner_name: d.owner?.name || local?.owner_name || 'Unknown Airline',
+        owner_logo: d.owner?.logo_symbol_url || '',
+        status: derivedStatus,
+        created_at: d.created_at || local?.created_at || new Date().toISOString(),
+        user_id: local?.user_id,
+        receipt_number: local?.receipt_number,
+        receipt_img: local?.receipt_img,
+        admin_review_status: local?.admin_review_status,
+        is_hold_booking: local?.is_hold_booking ?? true,
+        markup_percentage_at_booking: markupPct,
+        office_markup_amount: officeMarkupAmt,
+        office_total_amount: officeTotalAmt,
+        base_amount: local?.base_amount || (duffelTotal * 0.85).toFixed(2),
+        tax_amount: local?.tax_amount || (duffelTotal * 0.15).toFixed(2),
+        tickets: local?.tickets || [],
+      };
+    });
+
+    res.json(merged.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+  } catch (err: unknown) {
+    console.error('Error fetching live orders from Duffel:', err);
+    const error = err as DuffelError;
+    res.status(error.status || 500).json({
+      error: error.message || 'فشل جلب الطلبات من دافيل.',
+      code: error.code
+    });
+  }
 });
 
 /**
