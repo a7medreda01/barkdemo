@@ -592,19 +592,26 @@ export class App implements OnInit {
     }
   }
 
-  async fetchAdminOrders() {
-    try {
-      const response = await fetch('/api/admin/orders', {
-        headers: this.getHeaders()
-      });
-      if (response.ok) {
-        const data = await response.json() as DuffelOrder[];
-        this.adminOrdersList.set(data);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+adminOrdersLoading = signal<boolean>(false);
+adminOrdersError = signal<string | null>(null);
+
+async fetchAdminOrders() {
+  this.adminOrdersLoading.set(true);
+  this.adminOrdersError.set(null);
+  try {
+    const response = await fetch('/api/admin/orders', {
+      headers: this.getHeaders(),
+      cache: 'no-store'   // ⬅️ يمنع الـ 304 ويجبر السيرفر يرجّع بيانات جديدة كل مرة
+    });
+    if (!response.ok) throw new Error('فشل جلب طلبات النظام.');
+    const data = await response.json() as DuffelOrder[];
+    this.adminOrdersList.set(data);
+  } catch (e: unknown) {
+    this.adminOrdersError.set(e instanceof Error ? e.message : 'خطأ');
+  } finally {
+    this.adminOrdersLoading.set(false);
   }
+}
 
   async approveDeposit(id: string) {
     try {
