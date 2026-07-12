@@ -1282,4 +1282,15 @@ export class App implements OnInit {
       this.settingsSaving.set(false);
     }
   }
+  popularRoutes = [
+  { code: 'JED', city: 'جدة',    fromPrice: 90,  image: 'https://picsum.photos/seed/jeddah-route/400/500' },
+  { code: 'DXB', city: 'دبي',    fromPrice: 130, image: 'https://picsum.photos/seed/dubai-route/400/500' },
+  { code: 'IST', city: 'إسطنبول', fromPrice: 150, image: 'https://picsum.photos/seed/istanbul-route/400/500' },
+  { code: 'CAI', city: 'القاهرة', fromPrice: 60,  image: 'https://picsum.photos/seed/cairo-route/400/500' },
+];
+
+quickFillRoute(route: { code: string }) {
+  this.searchForm.get('destination')?.setValue(route.code);
+}
+currentYear = new Date().getFullYear();
 }

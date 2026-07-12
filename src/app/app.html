@@ -281,138 +281,195 @@
     @if (currentUser() && activeTab() === 'agency') {
       
       <!-- 1. HOME & FLIGHT SEARCH VIEW -->
+<!-- 1. HOME & FLIGHT SEARCH VIEW -->
       @if (userView() === 'home') {
-        <div class="space-y-8 animate-fade-in" id="agency-home-view">
-          
-          <!-- HERO BANNER -->
-          <div class="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-2xl" id="agency-hero">
-            <div class="absolute inset-0 bg-cover bg-center opacity-10 mix-blend-overlay" style="background-image: url('https://img.magnific.com/free-photo/view-3d-airplane-with-wings-engine_23-2151022210.jpg?semt=ais_hybrid&amp;w=740&amp;q=80');"></div>
-            <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/60 to-transparent"></div>
-            
-            <div class="relative z-10 px-6 py-10 sm:px-12 sm:py-16 max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center text-right" dir="rtl">
-              <div class="lg:col-span-7 space-y-4">
-                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/30 px-3 py-1 text-xs font-bold text-emerald-300">
+        <div class="space-y-10 animate-fade-in" id="agency-home-view">
+
+          <!-- HERO + FLOATING SEARCH CARD -->
+          <div class="relative" id="agency-hero-wrapper">
+
+            <!-- HERO BANNER -->
+            <div class="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-2xl h-[360px] sm:h-[420px]" id="agency-hero">
+              <img src="https://picsum.photos/seed/skyplan-hero-jet/1600/900"
+                   alt="طائرة سكاي بلان"
+                   class="absolute inset-0 h-full w-full object-cover"
+                   referrerpolicy="no-referrer">
+              <div class="absolute inset-0 bg-gradient-to-b from-slate-950/85 via-slate-900/55 to-slate-900/85"></div>
+
+              <div class="relative z-10 h-full flex flex-col items-center justify-center text-center px-6 gap-4">
+                <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-300">
                   🚀 محرك بحث وحجز فوري B2B
                 </span>
-                <h1 class="text-3xl sm:text-5xl font-black tracking-tight leading-tight">احجز لعملائك بالدفع الآجل أو المباشر</h1>
-                
-                <!-- Responsive mobile banner image -->
-                <div class="block lg:hidden my-4 overflow-hidden rounded-2xl border border-white/10 shadow-xl">
-                  <img src="https://img.magnific.com/free-photo/view-3d-airplane-with-wings-engine_23-2151022210.jpg?semt=ais_hybrid&amp;w=740&amp;q=80" 
-                       alt="SkyPlan Flight Booking Banner" 
-                       class="w-full h-48 object-cover object-center"
-                       referrerpolicy="no-referrer">
-                </div>
-
+                <h1 class="text-3xl sm:text-5xl font-black tracking-tight leading-tight max-w-2xl">
+                  أفضل عروض الطيران بانتظار عملائك
+                </h1>
                 <p class="text-slate-200 text-sm sm:text-base max-w-xl font-light leading-relaxed">
-                  وفر لعملائك تذاكر الطيران من كبرى شركات الطيران العالمية المتصلة بـ Duffel. ادفع فورياً من محفظتك الإلكترونية المعجلة أو اختر الحجز المؤقت (Hold) مع التحقق من الإدارة.
+                  ابحث وقارن واحجز رحلات عملائك مباشرة من Duffel، بالدفع الآجل (Hold) أو الفوري من المحفظة.
                 </p>
               </div>
-              
-              <!-- Desktop banner image -->
-              <div class="lg:col-span-5 hidden lg:block">
-                <div class="overflow-hidden rounded-3xl border border-white/10 shadow-2xl aspect-[4/3] hover:scale-[1.02] transition-transform duration-300">
-                  <img src="https://img.magnific.com/free-photo/view-3d-airplane-with-wings-engine_23-2151022210.jpg?semt=ais_hybrid&amp;w=740&amp;q=80" 
-                       alt="SkyPlan Flight Booking Banner" 
-                       class="w-full h-full object-cover object-center"
-                       referrerpolicy="no-referrer">
+            </div>
+
+            <!-- FLOATING SEARCH FORM -->
+            <div class="bg-white rounded-3xl border border-slate-100 shadow-xl p-4 sm:p-5 -mt-12 sm:-mt-16 relative z-20 max-w-5xl mx-auto" id="search-container">
+              <form [formGroup]="searchForm" (ngSubmit)="searchFlights()" id="flight-search-form">
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+
+                  <!-- Origin -->
+                  <div>
+                    <app-airport-select
+                      id="origin-select"
+                      label="مطار المغادرة"
+                      placeholder="مثال: CAI"
+                      [value]="searchForm.get('origin')?.value"
+                      (valueChange)="searchForm.get('origin')?.setValue($event)">
+                    </app-airport-select>
+                  </div>
+
+                  <!-- Destination -->
+                  <div>
+                    <app-airport-select
+                      id="destination-select"
+                      label="مطار الوصول"
+                      placeholder="مثال: JED"
+                      [value]="searchForm.get('destination')?.value"
+                      (valueChange)="searchForm.get('destination')?.setValue($event)">
+                    </app-airport-select>
+                  </div>
+
+                  <!-- Date -->
+                  <div class="space-y-1.5">
+                    <span class="flex items-center gap-1 justify-end text-xs font-bold text-slate-500" dir="rtl">
+                      <mat-icon class="text-sm">date_range</mat-icon> تاريخ الذهاب
+                    </span>
+                    <div class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-emerald-500 focus-within:bg-white transition">
+                      <input type="date" formControlName="departureDate"
+                             class="w-full text-sm font-bold text-slate-900 bg-transparent text-right focus:outline-none">
+                    </div>
+                  </div>
+
+                  <!-- Cabin + Passengers -->
+                  <div class="space-y-1.5">
+                    <span class="flex items-center gap-1 justify-end text-xs font-bold text-slate-500" dir="rtl">
+                      <mat-icon class="text-sm">star_outline</mat-icon> الدرجة والركاب
+                    </span>
+                    <div class="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 focus-within:border-emerald-500 focus-within:bg-white transition" dir="rtl">
+                      <select formControlName="passengerCount"
+                              class="flex-1 min-w-0 text-sm font-bold text-slate-900 bg-transparent focus:outline-none text-right cursor-pointer">
+                        <option [value]="1">1 مسافر</option>
+                        <option [value]="2">2 مسافرين</option>
+                        <option [value]="3">3 مسافرين</option>
+                        <option [value]="4">4 مسافرين</option>
+                      </select>
+                      <span class="text-slate-300 shrink-0">/</span>
+                      <select formControlName="cabinClass"
+                              class="flex-1 min-w-0 text-sm font-bold text-slate-900 bg-transparent focus:outline-none text-right cursor-pointer">
+                        <option value="economy">سياحية</option>
+                        <option value="premium_economy">سياحية مميزة</option>
+                        <option value="business">أعمال</option>
+                        <option value="first">أولى</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <!-- Submit button -->
+                  <div class="sm:col-span-2 lg:col-span-1 flex flex-col justify-end">
+                    <button type="submit" [disabled]="searchLoading()"
+                            class="w-full lg:w-14 h-[50px] shrink-0 flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 text-white font-bold text-sm shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50 cursor-pointer"
+                            id="search-submit-btn">
+                      @if (searchLoading()) {
+                        <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span class="lg:hidden">جاري البحث...</span>
+                      } @else {
+                        <mat-icon>arrow_back</mat-icon>
+                        <span class="lg:hidden">ابحث عن رحلات</span>
+                      }
+                    </button>
+                  </div>
+
                 </div>
-              </div>
+
+                <!-- Sandbox Route Hint -->
+                <div class="flex items-start gap-3 rounded-2xl bg-emerald-50/50 border border-emerald-150 p-3 mt-4 justify-end" dir="rtl">
+                  <span class="text-lg">💡</span>
+                  <div class="text-[11px] leading-relaxed text-slate-600 text-right">
+                    <strong class="text-emerald-900 font-bold">لضمان عروض تدعم الحجز الآجل (Hold):</strong>
+                    ابحث بين القاهرة <span class="bg-emerald-100 text-emerald-800 font-bold px-1 rounded font-mono">CAI</span> وجدة <span class="bg-emerald-100 text-emerald-800 font-bold px-1 rounded font-mono">JED</span>، أو <span class="bg-slate-200 px-1 rounded font-mono text-slate-800 font-bold">JFK</span> و <span class="bg-slate-200 px-1 rounded font-mono text-slate-800 font-bold font-sans">EWR</span>.
+                  </div>
+                </div>
+              </form>
             </div>
           </div>
 
-          <!-- SEARCH FORM -->
-          <div class="bg-white rounded-3xl border border-slate-100 shadow-xl p-6 sm:p-8 -mt-16 relative z-20 max-w-6xl mx-auto" id="search-container">
-            <form [formGroup]="searchForm" (ngSubmit)="searchFlights()" class="space-y-6" id="flight-search-form">
-              <div class="grid grid-cols-1 md:grid-cols-5 gap-5">
-                
-                <!-- Origin Select -->
-                <div class="space-y-2">
-                  <app-airport-select
-                    id="origin-select"
-                    label="مطار المغادرة"
-                    placeholder="مثال: CAI"
-                    [value]="searchForm.get('origin')?.value"
-                    (valueChange)="searchForm.get('origin')?.setValue($event)">
-                  </app-airport-select>
-                </div>
+          <!-- POPULAR ROUTES -->
+          <div class="max-w-6xl mx-auto space-y-4 px-1" id="popular-routes-section">
+            <div class="flex items-center justify-between" dir="rtl">
+              <h2 class="text-lg font-black text-slate-900">وجهات رائجة لعملائك</h2>
+              <span class="text-xs text-slate-400 font-semibold">أسعار تقديرية تبدأ من</span>
+            </div>
 
-                <!-- Destination Select -->
-                <div class="space-y-2">
-                  <app-airport-select
-                    id="destination-select"
-                    label="مطار الوصول"
-                    placeholder="مثال: JED"
-                    [value]="searchForm.get('destination')?.value"
-                    (valueChange)="searchForm.get('destination')?.setValue($event)">
-                  </app-airport-select>
-                </div>
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              @for (route of popularRoutes; track route.code) {
+                <button type="button" (click)="quickFillRoute(route)"
+                        class="group relative overflow-hidden rounded-2xl shadow-sm border border-slate-100 aspect-[4/5] text-right cursor-pointer">
+                  <img [src]="route.image" [alt]="route.city"
+                       class="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                       referrerpolicy="no-referrer">
+                  <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-900/10 to-transparent"></div>
+                  <div class="absolute bottom-0 right-0 p-3 text-right w-full" dir="rtl">
+                    <span class="block text-sm font-black text-white">{{ route.city }}</span>
+                    <span class="block text-[10px] text-emerald-300 font-bold">من ${{ route.fromPrice }}</span>
+                  </div>
+                </button>
+              }
+            </div>
+          </div>
 
-                <!-- Date -->
-                <div class="space-y-2">
-                  <span class="block text-xs font-bold text-slate-500 flex items-center gap-1 justify-end" dir="rtl">
-                    <mat-icon class="text-sm">date_range</mat-icon> تاريخ الذهاب
-                  </span>
-                  <input type="date" formControlName="departureDate"
-                         class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none transition">
-                </div>
+          <!-- ADVANTAGES / MARKETING SECTION -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-6xl mx-auto px-1" id="agency-features-grid" dir="rtl">
 
-                <!-- Cabin -->
-                <div class="space-y-2">
-                  <span class="block text-xs font-bold text-slate-500 flex items-center gap-1 justify-end" dir="rtl">
-                    <mat-icon class="text-sm">star_outline</mat-icon> درجة السفر
-                  </span>
-                  <select formControlName="cabinClass"
-                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none transition">
-                    <option value="economy">الدرجة السياحية</option>
-                    <option value="premium_economy">السياحية المتميزة</option>
-                    <option value="business">درجة رجال الأعمال</option>
-                    <option value="first">الدرجة الأولى</option>
-                  </select>
-                </div>
-
-                <!-- Passengers -->
-                <div class="space-y-2">
-                  <span class="block text-xs font-bold text-slate-500 flex items-center gap-1 justify-end" dir="rtl">
-                    <mat-icon class="text-sm">people_outline</mat-icon> عدد الركاب
-                  </span>
-                  <select formControlName="passengerCount"
-                          class="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-bold text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none transition">
-                    <option [value]="1">1 مسافر بالغ</option>
-                    <option [value]="2">2 مسافرين</option>
-                    <option [value]="3">3 مسافرين</option>
-                    <option [value]="4">4 مسافرين</option>
-                  </select>
-                </div>
-
+            <div class="flex flex-col items-center text-center gap-2 p-4">
+              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 shadow-inner">
+                <mat-icon class="text-2xl">military_tech</mat-icon>
               </div>
+              <h3 class="text-sm font-black text-slate-900">ضمان أفضل سعر</h3>
+              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">إن وجدت نفس الرحلة بسعر أقل بمكان آخر، تواصل معنا وسنطابق السعر لك فوراً.</p>
+            </div>
 
-              <!-- Sandbox Route Hint -->
-              <div class="flex items-start gap-3 rounded-2xl bg-emerald-50/50 border border-emerald-150 p-4 justify-end" dir="rtl">
-                <span class="text-xl">💡</span>
-                <div class="text-xs leading-relaxed text-slate-600 text-right">
-                  <strong class="text-emerald-900 font-bold">لضمان الحصول على عروض تدعم التثبيت المالي والحجز الآجل (Hold):</strong> 
-                  ابحث عن الرحلات بين القاهرة <span class="bg-emerald-100 text-emerald-800 font-bold px-1 rounded font-mono">CAI</span> وجدة <span class="bg-emerald-100 text-emerald-800 font-bold px-1 rounded font-mono">JED</span>، أو الزوج الافتراضي المضمون <span class="bg-slate-200 px-1 rounded font-mono text-slate-800 font-bold">JFK</span> و <span class="bg-slate-200 px-1 rounded font-mono text-slate-800 font-bold font-sans">EWR</span> في تاريخ قادم.
-                </div>
+            <div class="flex flex-col items-center text-center gap-2 p-4">
+              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-sky-50 text-sky-500 shadow-inner">
+                <mat-icon class="text-2xl">credit_card</mat-icon>
               </div>
+              <h3 class="text-sm font-black text-slate-900">استرجاع وإلغاء الحجوزات</h3>
+              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">هل تم إلغاء رحلة عميلك؟ فريقنا يغطي طلبات الاسترجاع الفورية بكل سهولة.</p>
+            </div>
 
-              <div class="flex justify-between items-center pt-2">
-                <span class="text-xs text-slate-400">جميع الأسعار المعروضة حقيقية بالاتصال المباشر بنظام Duffel.</span>
-                <button type="submit" [disabled]="searchLoading()"
-                        class="flex items-center gap-2 rounded-2xl bg-emerald-600 px-8 py-4 text-base font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-95 transition disabled:opacity-50 cursor-pointer">
-                  @if (searchLoading()) {
-                    <svg class="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>جاري جلب الأسعار المباشرة من دافيل...</span>
-                  } @else {
-                    <mat-icon>search</mat-icon>
-                    <span>البحث عن أفضل الرحلات</span>
-                  }
+            <div class="flex flex-col items-center text-center gap-2 p-4">
+              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 shadow-inner">
+                <mat-icon class="text-2xl">support_agent</mat-icon>
+              </div>
+              <h3 class="text-sm font-black text-slate-900">دعم فني على مدار الساعة</h3>
+              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">فريق المحاسبة والدعم متاح طوال الوقت لمراجعة الإيصالات وتأكيد الحجوزات.</p>
+            </div>
+
+          </div>
+
+          <!-- MOBILE APP PROMO BANNER -->
+          <div class="relative overflow-hidden rounded-3xl bg-gradient-to-l from-sky-600 to-emerald-600 text-white shadow-xl max-w-6xl mx-auto" id="app-promo-banner">
+            <div class="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6 p-8 sm:p-10 text-right" dir="rtl">
+              <div class="space-y-3 max-w-md">
+                <h3 class="text-xl sm:text-2xl font-black leading-snug">حمّل تطبيق SkyPlan للوكلاء واحجز أينما كنت</h3>
+                <p class="text-sm text-white/80 leading-relaxed">تابع حجوزات عملائك، اشحن محفظتك، وأصدر التذاكر مباشرة من هاتفك أينما كنت.</p>
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-white text-emerald-700 font-black px-5 py-3 text-xs shadow-md hover:bg-slate-50 transition cursor-pointer">
+                  <mat-icon class="text-base">download</mat-icon>
+                  <span>تحميل التطبيق الآن</span>
                 </button>
               </div>
-            </form>
+              <mat-icon class="text-white/25 text-8xl -rotate-45 hidden sm:block">flight</mat-icon>
+            </div>
           </div>
 
         </div>
