@@ -2,14 +2,14 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/barkdemo/server/server.mjs",
+      "src": "dist/bark/server/server.mjs",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/barkdemo/server/server.mjs"
+      "dest": "dist/bark/server/server.mjs"
     }
   ]
 }

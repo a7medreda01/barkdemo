@@ -7,7 +7,7 @@
       "type": "chrome",
       "request": "launch",
       "preLaunchTask": "npm: start",
-      "url": "https://barkdemo-three.vercel.app/"
+      "url": "https://bark-three.vercel.app/"
     },
     {
       "name": "ng test",
