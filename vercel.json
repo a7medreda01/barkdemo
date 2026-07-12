@@ -1,20 +1,10 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist/app/browser",
+  "rewrites": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "dist/app/browser" }
-    },
-    {
-      "src": "dist/app/server/server.mjs",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "dist/app/server/server.mjs"
+      "source": "/(.*)",
+      "destination": "/api/server"
     }
   ]
 }
