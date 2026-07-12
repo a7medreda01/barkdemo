@@ -2,14 +2,19 @@
   "version": 2,
   "builds": [
     {
-      "src": "dist/bark/server/server.mjs",
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "dist/app/browser" }
+    },
+    {
+      "src": "dist/app/server/server.mjs",
       "use": "@vercel/node"
     }
   ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "dist/bark/server/server.mjs"
+      "dest": "dist/app/server/server.mjs"
     }
   ]
 }
