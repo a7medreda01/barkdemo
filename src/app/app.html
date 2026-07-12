@@ -290,7 +290,7 @@
 
             <!-- HERO BANNER -->
             <div class="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-2xl h-[360px] sm:h-[420px]" id="agency-hero">
-              <img src="https://picsum.photos/seed/برق-hero-jet/1600/900"
+              <img src="https://img.magnific.com/free-photo/view-3d-airplane-with-wings-engine_23-2151022210.jpg?semt=ais_hybrid&w=740&q=80"
                    alt="طائرة سكاي بلان"
                    class="absolute inset-0 h-full w-full object-cover"
                    referrerpolicy="no-referrer">
@@ -1828,7 +1828,90 @@
 
 
   </main>
+  <!-- ==============================================
+       FOOTER
+       ============================================== -->
+  <footer class="bg-slate-900 text-slate-300 mt-auto pb-24 lg:pb-0" id="main-footer">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
 
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 text-right" dir="rtl">
+
+        <!-- Brand block -->
+        <div class="space-y-3 sm:col-span-2 lg:col-span-1">
+          <div class="flex items-center gap-2.5 justify-start">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400 shrink-0">
+              <mat-icon class="text-xl">flight_takeoff</mat-icon>
+            </div>
+            <span class="text-xl font-black text-white">برق <span class="font-light text-slate-300">بزنس</span></span>
+          </div>
+          <p class="text-xs text-slate-400 leading-relaxed max-w-xs">
+            منصة B2B متكاملة لوكلاء ومكاتب السفر والسياحة، تتيح البحث والمقارنة والحجز الفوري لرحلات الطيران عبر الربط المباشر مع Duffel API.
+          </p>
+          <div class="flex items-center gap-2 pt-1">
+            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-400 transition cursor-pointer" title="تويتر / X">
+              <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+            </a>
+            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-emerald-500/20 hover:text-emerald-400 transition cursor-pointer" title="انستغرام">
+              <mat-icon class="text-lg">photo_camera</mat-icon>
+            </a>
+            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-[#25D366]/20 hover:text-[#25D366] transition cursor-pointer" title="واتساب الدعم الفني">
+              <mat-icon class="text-lg">chat</mat-icon>
+            </a>
+          </div>
+        </div>
+
+        <!-- Quick links -->
+        <div class="space-y-3">
+          <h4 class="text-sm font-black text-white">روابط سريعة</h4>
+          <ul class="space-y-2 text-xs">
+            <li><button (click)="userView.set('home')" class="hover:text-emerald-400 transition cursor-pointer">البحث عن رحلات</button></li>
+            <li><button (click)="userView.set('bookings')" class="hover:text-emerald-400 transition cursor-pointer">تتبع الحجوزات</button></li>
+            <li><button (click)="userView.set('wallet')" class="hover:text-emerald-400 transition cursor-pointer">المحفظة والشحن</button></li>
+            <li><button (click)="userView.set('notifications')" class="hover:text-emerald-400 transition cursor-pointer">الإشعارات</button></li>
+          </ul>
+        </div>
+
+        <!-- Support -->
+        <div class="space-y-3">
+          <h4 class="text-sm font-black text-white">الدعم والمساعدة</h4>
+          <ul class="space-y-2 text-xs">
+            <li><a href="#" class="hover:text-emerald-400 transition">الأسئلة الشائعة</a></li>
+            <li><a href="#" class="hover:text-emerald-400 transition">سياسة الاسترجاع والإلغاء</a></li>
+            <li><a href="#" class="hover:text-emerald-400 transition">الشروط والأحكام</a></li>
+            <li><a href="#" class="hover:text-emerald-400 transition">سياسة الخصوصية</a></li>
+          </ul>
+        </div>
+
+        <!-- Contact -->
+        <div class="space-y-3">
+          <h4 class="text-sm font-black text-white">تواصل معنا</h4>
+          <ul class="space-y-2.5 text-xs">
+            <li class="flex items-center gap-2 justify-start">
+              <mat-icon class="text-sm text-emerald-400 shrink-0">mail</mat-icon>
+              <span class="break-all">support&#64;barq-business.com</span>
+            </li>
+            <li class="flex items-center gap-2 justify-start">
+              <mat-icon class="text-sm text-emerald-400 shrink-0">call</mat-icon>
+              <span dir="ltr">+966 11 234 5678</span>
+            </li>
+            <li class="flex items-center gap-2 justify-start">
+              <mat-icon class="text-sm text-emerald-400 shrink-0">schedule</mat-icon>
+              <span>الدعم متاح على مدار الساعة، طوال أيام الأسبوع</span>
+            </li>
+          </ul>
+        </div>
+
+      </div>
+
+      <div class="mt-8 sm:mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right" dir="rtl">
+        <span class="text-[11px] text-slate-500">© {{ currentYear }} برق بزنس. جميع الحقوق محفوظة.</span>
+        <span class="text-[11px] text-slate-500 flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+          يعمل حالياً في وضع Duffel Sandbox للتجربة فقط
+        </span>
+      </div>
+    </div>
+  </footer>
   <!-- ==============================================
        MODAL 1: PASSENGER BOOKING DIALOG & METHOD SELECTOR
        ============================================== -->

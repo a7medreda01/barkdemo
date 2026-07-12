@@ -9,3 +9,8 @@
   --color-brand-primary: #0b947a;
   --color-brand-dark: #0f172a;
 }
+input,
+select,
+textarea {
+    font-size: 16px !important;
+}
