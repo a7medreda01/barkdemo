@@ -1,48 +1,51 @@
 {
-  "name": "bark",
+  "name": "ai-studio-angular-app",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
+    "dev": "cross-env ng serve --port=3000 --host=0.0.0.0 --allowed-hosts=true ${DISABLE_HMR:+--live-reload=false}",
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
-    "test": "ng test"
-  },
-  "prettier": {
-    "printWidth": 100,
-    "singleQuote": true,
-    "overrides": [
-      {
-        "files": "*.html",
-        "options": {
-          "parser": "angular"
-        }
-      }
-    ]
+    "test": "ng test",
+    "lint": "ng lint",
+    "serve:ssr:app": "node dist/app/server/server.mjs"
   },
   "private": true,
   "dependencies": {
-    "@angular/common": "^20.3.0",
-    "@angular/compiler": "^20.3.0",
-    "@angular/core": "^20.3.0",
-    "@angular/forms": "^20.3.0",
-    "@angular/platform-browser": "^20.3.0",
-    "@angular/router": "^20.3.0",
+    "@angular/cdk": "^21.0.0",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/material": "^21.0.0",
+    "@angular/platform-browser": "^21.0.0",
+    "@angular/platform-server": "^21.0.0",
+    "@angular/router": "^21.0.0",
+    "@angular/ssr": "^21.0.0",
+    "@google/genai": "^2.4.0",
+    "express": "^5.1.0",
+    "motion": "^12.23.24",
+    "pdfkit": "^0.19.1",
     "rxjs": "~7.8.0",
-    "tslib": "^2.3.0",
-    "zone.js": "~0.15.0"
+    "tslib": "^2.3.0"
   },
   "devDependencies": {
-    "@angular/build": "^20.3.15",
-    "@angular/cli": "^20.3.15",
-    "@angular/compiler-cli": "^20.3.0",
-    "@types/jasmine": "~5.1.0",
-    "jasmine-core": "~5.9.0",
-    "karma": "~6.4.0",
-    "karma-chrome-launcher": "~3.2.0",
-    "karma-coverage": "~2.2.0",
-    "karma-jasmine": "~5.1.0",
-    "karma-jasmine-html-reporter": "~2.1.0",
-    "typescript": "~5.9.2"
+    "@angular/build": "^21.0.0",
+    "@angular/cli": "^21.0.0",
+    "@angular/compiler-cli": "^21.0.0",
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/express": "^5.0.1",
+    "@types/node": "^20.17.19",
+    "@types/pdfkit": "^0.17.6",
+    "angular-eslint": "21.1.0",
+    "cross-env": "^10.1.0",
+    "eslint": "^9.39.1",
+    "jsdom": "^27.0.0",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^4.1.12",
+    "typescript": "~5.9.2",
+    "typescript-eslint": "8.47.0",
+    "vitest": "^4.0.0"
   }
 }

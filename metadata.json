@@ -1,0 +1,6 @@
+{
+  "name": "SkyPlan B2B Flight Booking",
+  "description": "A professional B2B flight booking platform integrating the Duffel API with dual-role agency portal and admin dashboard views.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

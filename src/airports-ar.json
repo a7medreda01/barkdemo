@@ -1,0 +1,21 @@
+[
+  { "iata_code": "CAI", "name_ar": "مطار القاهرة الدولي", "city_ar": "القاهرة", "country_ar": "مصر" },
+  { "iata_code": "HRG", "name_ar": "مطار الغردقة الدولي", "city_ar": "الغردقة", "country_ar": "مصر" },
+  { "iata_code": "SSH", "name_ar": "مطار شرم الشيخ الدولي", "city_ar": "شرم الشيخ", "country_ar": "مصر" },
+  { "iata_code": "LXR", "name_ar": "مطار الأقصر الدولي", "city_ar": "الأقصر", "country_ar": "مصر" },
+  { "iata_code": "JED", "name_ar": "مطار الملك عبدالعزيز الدولي", "city_ar": "جدة", "country_ar": "السعودية" },
+  { "iata_code": "RUH", "name_ar": "مطار الملك خالد الدولي", "city_ar": "الرياض", "country_ar": "السعودية" },
+  { "iata_code": "MED", "name_ar": "مطار الأمير محمد بن عبدالعزيز الدولي", "city_ar": "المدينة المنورة", "country_ar": "السعودية" },
+  { "iata_code": "DMM", "name_ar": "مطار الملك فهد الدولي", "city_ar": "الدمام", "country_ar": "السعودية" },
+  { "iata_code": "DXB", "name_ar": "مطار دبي الدولي", "city_ar": "دبي", "country_ar": "الإمارات" },
+  { "iata_code": "AUH", "name_ar": "مطار أبوظبي الدولي", "city_ar": "أبوظبي", "country_ar": "الإمارات" },
+  { "iata_code": "DOH", "name_ar": "مطار حمد الدولي", "city_ar": "الدوحة", "country_ar": "قطر" },
+  { "iata_code": "KWI", "name_ar": "مطار الكويت الدولي", "city_ar": "الكويت", "country_ar": "الكويت" },
+  { "iata_code": "BAH", "name_ar": "مطار البحرين الدولي", "city_ar": "المنامة", "country_ar": "البحرين" },
+  { "iata_code": "MCT", "name_ar": "مطار مسقط الدولي", "city_ar": "مسقط", "country_ar": "عمان" },
+  { "iata_code": "AMM", "name_ar": "مطار الملكة علياء الدولي", "city_ar": "عمان", "country_ar": "الأردن" },
+  { "iata_code": "JFK", "name_ar": "مطار جون إف كينيدي الدولي", "city_ar": "نيويورك", "country_ar": "الولايات المتحدة" },
+  { "iata_code": "LHR", "name_ar": "مطار هيثرو الدولي", "city_ar": "لندن", "country_ar": "المملكة المتحدة" },
+  { "iata_code": "CDG", "name_ar": "مطار شارل ديغول", "city_ar": "باريس", "country_ar": "فرنسا" },
+  { "iata_code": "IST", "name_ar": "مطار إسطنبول الدولي", "city_ar": "إسطنبول", "country_ar": "تركيا" }
+]
