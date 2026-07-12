@@ -128,7 +128,7 @@ const notifications: Notification[] = [
     id: 'notif_01',
     user_id: 'usr_ahmed',
     title: 'تم تفعيل المحفظة',
-    message: 'مرحباً بك في محفظة SkyPlan. يمكنك الآن شحن رصيدك عبر التحويل البنكي وحجز رحلاتك.',
+    message: 'مرحباً بك في محفظة برق. يمكنك الآن شحن رصيدك عبر التحويل البنكي وحجز رحلاتك.',
     read: false,
     created_at: new Date(Date.now() - 3600000 * 24).toISOString()
   },
@@ -361,7 +361,7 @@ app.post('/api/auth/login', (req, res) => {
     notifications.push({
       id: 'notif_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
-      title: 'مرحباً بك في SkyPlan!',
+      title: 'مرحباً بك في برق!',
       message: 'تم إنشاء حسابك بنجاح ومنحك رصيداً ترحيبياً بقيمة $500.00 في محفظتك الإلكترونية.',
       read: false,
       created_at: new Date().toISOString()
@@ -403,7 +403,7 @@ app.post('/api/auth/register', (req, res) => {
   notifications.push({
     id: 'notif_' + Math.random().toString(36).substr(2, 9),
     user_id: user.id,
-    title: 'مرحباً بك في عائلة SkyPlan',
+    title: 'مرحباً بك في عائلة برق',
     message: 'تم تسجيل حسابك بنجاح. يمكنك شحن محفظتك الآن للبدء بحجز رحلات الطيران الفورية.',
     read: false,
     created_at: new Date().toISOString()
@@ -1000,7 +1000,7 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
 
     // Title & Brand
     setFont(true);
-    doc.fillColor(emerald).fontSize(18).text('SkyPlan Business', 40, 40);
+    doc.fillColor(emerald).fontSize(18).text('برق Business', 40, 40);
     setFont(false);
     doc.fillColor(slateGray).fontSize(10).text('بوابة وكلاء B2B للسفر والسياحة', 40, 65);
 
@@ -1136,7 +1136,7 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
 
     // Footer contact
     setFont(false);
-    doc.fillColor(slateGray).fontSize(8).text('بوابة SkyPlan Business الإلكترونية للشركات والوكلاء • القاهرة، جمهورية مصر العربية', 40, 765, { align: 'center', width: 510 });
+    doc.fillColor(slateGray).fontSize(8).text('بوابة برق Business الإلكترونية للشركات والوكلاء • القاهرة، جمهورية مصر العربية', 40, 765, { align: 'center', width: 510 });
     doc.fillColor(slateGray).fontSize(8).text('This is an official B2B travel agency booking confirmation document. Thank you for booking with us!', 40, 778, { align: 'center', width: 510 });
 
     doc.end();

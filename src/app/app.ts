@@ -324,7 +324,7 @@ export class App implements OnInit {
   async tryAutoLogin() {
     if (typeof window === 'undefined') return;
     
-    const cached = localStorage.getItem('skyplan_user');
+    const cached = localStorage.getItem('برق_user');
     if (cached) {
       try {
         const user = JSON.parse(cached) as User;
@@ -332,7 +332,7 @@ export class App implements OnInit {
         this.fetchUserData();
         return;
       } catch {
-        localStorage.removeItem('skyplan_user');
+        localStorage.removeItem('برق_user');
       }
     }
 
@@ -346,7 +346,7 @@ export class App implements OnInit {
       const data = await response.json() as { user: User };
       if (response.ok && data.user) {
         this.currentUser.set(data.user);
-        localStorage.setItem('skyplan_user', JSON.stringify(data.user));
+        localStorage.setItem('برق_user', JSON.stringify(data.user));
         this.fetchUserData();
       }
     } catch (err) {
@@ -374,7 +374,7 @@ export class App implements OnInit {
         const user = await response.json() as User;
         this.currentUser.set(user);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('skyplan_user', JSON.stringify(user));
+          localStorage.setItem('برق_user', JSON.stringify(user));
         }
       }
     } catch (e) {
@@ -449,7 +449,7 @@ export class App implements OnInit {
 
       if (data.user) {
         this.currentUser.set(data.user);
-        localStorage.setItem('skyplan_user', JSON.stringify(data.user));
+        localStorage.setItem('برق_user', JSON.stringify(data.user));
         this.showToast(`أهلاً بك مجدداً، ${data.user.name}!`, 'success');
         this.fetchUserData();
         this.userView.set('home');
@@ -480,7 +480,7 @@ export class App implements OnInit {
 
       if (data.user) {
         this.currentUser.set(data.user);
-        localStorage.setItem('skyplan_user', JSON.stringify(data.user));
+        localStorage.setItem('برق_user', JSON.stringify(data.user));
         this.showToast(`تم إنشاء حسابك بنجاح! مرحباً بك، ${data.user.name}!`, 'success');
         this.fetchUserData();
         this.userView.set('home');
@@ -495,7 +495,7 @@ export class App implements OnInit {
   logout() {
     this.currentUser.set(null);
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('skyplan_user');
+      localStorage.removeItem('برق_user');
     }
     this.showToast('تم تسجيل الخروج بنجاح.', 'info');
     this.userView.set('login');
@@ -1224,7 +1224,7 @@ export class App implements OnInit {
 
     textMessage += `\n💰 المبلغ الإجمالي: *${order.office_total_amount} ${order.total_currency}*\n`;
     textMessage += `\n📄 لقد قمنا بتحميل وثيقة البرنامج الرسمية (PDF) على جهازك، يرجى إرفاقها وإرسالها مع هذه الرسالة للعميل.`;
-    textMessage += `\n\nشكراً لاختيارك *SkyPlan B2B*!`;
+    textMessage += `\n\nشكراً لاختيارك *برق B2B*!`;
 
     const encodedText = encodeURIComponent(textMessage);
     const waUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
