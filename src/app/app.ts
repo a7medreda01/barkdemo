@@ -613,6 +613,40 @@ async fetchAdminOrders() {
   }
 }
 
+// --- حالة القائمة الجانبية والمحفظة السريعة ---
+sideMenuOpen = signal<boolean>(false);
+walletDropdownOpen = signal<boolean>(false);
+ 
+// --- حالة النظام (شريط "متصل بـ Duffel") ---
+systemStatus = signal<'connected' | 'degraded' | 'down'>('connected');
+ 
+// --- الحد الائتماني ---
+creditLimit = signal<number>(5000);           // عدّل القيمة الافتراضية أو اجلبها من الـ API
+creditLimitRemaining = signal<number>(5000);  // creditLimit - المبالغ المستخدمة حالياً
+ 
+// --- إحصائيات اليوم (بطاقات الصفحة الرئيسية) ---
+todayStats = signal<{
+  bookings: number;
+  ticketsIssued: number;
+  amountsDue: number;
+  refunds: number;
+}>({
+  bookings: 0,
+  ticketsIssued: 0,
+  amountsDue: 0,
+  refunds: 0,
+});
+ 
+// --- نوع الرحلة في مربع البحث (ذهاب فقط / ذهاب وعودة / وجهات متعددة) ---
+tripType = signal<'oneway' | 'roundtrip' | 'multicity'>('roundtrip');
+ 
+// --- زر تبديل "من" و"إلى" في مربع البحث ---
+swapOriginDestination(): void {
+  const origin = this.searchForm.get('origin')?.value;
+  const destination = this.searchForm.get('destination')?.value;
+  this.searchForm.get('origin')?.setValue(destination);
+  this.searchForm.get('destination')?.setValue(origin);
+}
   async approveDeposit(id: string) {
     try {
       this.showToast('جاري الموافقة على الإيداع وشحن محفظة العميل...', 'info');
