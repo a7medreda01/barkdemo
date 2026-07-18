@@ -1,40 +1,3 @@
-<!--
-==================================================================================
-  BARQ BUSINESS — قالب محدث حسب ملاحظات التقييم (PDF)
-==================================================================================
-  ملخص التعديلات المطبّقة من الملاحظات:
-  1) الشريط العلوي: تم تخفيفه، ونُقلت (الملف الشخصي) إلى قائمة جانبية (Side Menu)،
-     وأُبقي في الأعلى فقط: الشعار + شريط حالة النظام (متصل بـ Duffel) + الرصيد + زر القائمة.
-  2) الألوان: الهوية الأساسية الآن كحلي (slate-900) + ذهبي (amber-500/600) + أبيض،
-     واللون الأخضر (emerald) أصبح مخصصًا فقط لرسائل النجاح ولعرض الرصيد المالي.
-  3) صورة الهيرو: تمت إضافة طبقة تعتيم أقوى (overlay) لتوضيح النص، مع ملاحظة داخل
-     الكود لاستبدال الصورة بصورة احترافية لطائرة في مسار إقلاع→هبوط عند توفرها.
-  4) مربع البحث: أعيد تصميمه بأسلوب Google Flights (تبويب ذهاب/ذهاب وعودة/وجهات متعددة،
-     زر تبديل من↔إلى، حقل عودة شرطي، زر بحث أكبر وبلون ذهبي واضح).
-  5) المحفظة: عند الضغط على أيقونة المحفظة بالأعلى تظهر نافذة منسدلة صغيرة (Wallet
-     Quick View) تعرض: الرصيد، الحد الائتماني، رابط كشف الحساب، وزر إيداع سريع.
-  6) "تتبع الحجوزات" تم تغييرها إلى "إدارة الحجوزات" في كل الواجهة.
-  7) الصفحة الرئيسية: أُضيفت بطاقات حالة تشغيلية ومالية (حجوزات اليوم، التذاكر
-     الصادرة اليوم، المبالغ المستحقة، عمليات الاسترداد، الرصيد، الحد الائتماني المتبقي).
-  8) الشعار: تحسين بسيط بخط أوضح وتمييز عربي بلون ذهبي دقيق.
-  9) شريط حالة النظام: 🟢 متصل بـ Duffel، ظاهر بشكل دائم أعلى الصفحة.
-  10) NAVBAR سفلي احترافي للموبايل (5 عناصر) مع مؤشر تفعيل، ومساحة آمنة لأسفل
-      الشاشة (safe-area)، ويظهر فقط على الشاشات الصغيرة (lg:hidden).
-
-  ⚠️ ملاحظة مهمة للمطوّر (ملف .ts الخاص بالمكوّن):
-  هذا القالب يفترض وجود signals/متغيرات إضافية في المكوّن غير موجودة في القالب
-  الأصلي، أضفها في ملف الـ Component:
-    - sideMenuOpen = signal(false)
-    - walletDropdownOpen = signal(false)
-    - systemStatus = signal<'connected' | 'degraded' | 'down'>('connected')
-    - creditLimit = signal(0)              // الحد الائتماني الكلي
-    - creditLimitRemaining = signal(0)     // الحد الائتماني المتبقي
-    - todayStats = signal({ bookings: 0, ticketsIssued: 0, amountsDue: 0, refunds: 0 })
-    - tripType = signal<'oneway' | 'roundtrip' | 'multicity'>('roundtrip')
-  كل الأسماء الأصلية (currentUser, userView, activeTab, searchForm, ordersList...)
-  أُبقيت كما هي بدون أي تغيير حتى يتصل القالب مباشرة بنفس منطق المكوّن الحالي.
-==================================================================================
--->
 <div class="min-h-screen bg-slate-50 font-sans text-slate-800 antialiased selection:bg-amber-100 selection:text-amber-900 pb-20 lg:pb-0" dir="rtl" id="app-root-container">
 
   <!-- TOAST NOTIFICATION -->
@@ -53,47 +16,28 @@
            [class.text-slate-600]="toastType() === 'info'">
         <mat-icon>{{ toastType() === 'success' ? 'check_circle' : toastType() === 'error' ? 'error_outline' : 'info_outline' }}</mat-icon>
       </div>
-      <div>
+      <div class="flex-1 min-w-0">
         <p class="text-sm font-medium text-slate-900 leading-relaxed">{{ toastMessage() }}</p>
       </div>
-      <button (click)="toastMessage.set(null)" class="text-slate-400 hover:text-slate-600 mr-2 cursor-pointer" id="close-toast-btn">
+      <button (click)="toastMessage.set(null)" class="text-slate-400 hover:text-slate-600 mr-2 cursor-pointer shrink-0" id="close-toast-btn">
         <mat-icon class="text-lg">close</mat-icon>
       </button>
     </div>
   }
 
-  <!-- ==============================================
-       HEADER — مُخفّف حسب الملاحظة رقم 1
-       ============================================== -->
+  <!-- HEADER -->
   <header class="sticky top-0 z-40 bg-slate-900 border-b border-slate-800 shadow-sm" id="main-header">
-
-    <!-- شريط حالة النظام (ملاحظة رقم 9)
-    <div class="hidden sm:flex items-center justify-center gap-2 bg-slate-950/60 text-[11px] font-semibold text-slate-300 py-1.5 border-b border-white/5">
-      @if (systemStatus() === 'connected') {
-        <span class="flex h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-        <span class="text-emerald-300">متصل بـ Duffel</span>
-      } @else if (systemStatus() === 'degraded') {
-        <span class="flex h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-        <span class="text-amber-300">أداء بطيء حالياً مع Duffel</span>
-      } @else {
-        <span class="flex h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse"></span>
-        <span class="text-rose-300">انقطاع مؤقت في الاتصال بـ Duffel</span>
-      }
-      <span class="text-slate-500">•</span>
-      <span class="text-amber-400/90">وضع المطورين التجريبي — Sandbox</span>
-    </div> -->
-
     <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
       <div class="flex h-[72px] items-center justify-between gap-4">
 
-        <!-- زر القائمة الجانبية (يحل محل الأيقونات المبعثرة سابقاً) -->
+        <!-- side menu button -->
         @if (currentUser()) {
           <button (click)="sideMenuOpen.set(true)" class="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/5 text-white hover:bg-white/10 transition cursor-pointer shrink-0" id="open-side-menu-btn" title="القائمة">
             <mat-icon>menu</mat-icon>
           </button>
         }
 
-        <!-- Brand Logo — تحسين بسيط للخط (ملاحظة رقم 8) -->
+        <!-- Brand Logo -->
         <div class="flex items-center gap-2.5 shrink-0">
           <div class="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-400 shadow-inner border border-amber-400/20">
             <mat-icon class="text-2xl">flight_takeoff</mat-icon>
@@ -111,7 +55,7 @@
 
           @if (currentUser(); as user) {
 
-            <!-- Tab switcher (Agency vs Admin) — يظهر فقط على الشاشات المتوسطة فأكبر -->
+            <!-- Tab switcher -->
             <nav class="hidden md:flex items-center gap-1 bg-white/5 p-1 rounded-2xl shrink-0" id="role-nav">
               <button (click)="switchTab('agency')"
                       [class.bg-amber-500]="activeTab() === 'agency'"
@@ -133,7 +77,7 @@
               </button>
             </nav>
 
-            <!-- Wallet Mini-indicator (يفتح Quick View بدل الانتقال المباشر) — ملاحظة رقم 5 -->
+            <!-- Wallet Mini-indicator -->
             <div class="relative">
               <button (click)="walletDropdownOpen.set(!walletDropdownOpen())"
                       class="flex items-center gap-2 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 py-1.5 pr-3 pl-1.5 transition cursor-pointer"
@@ -195,14 +139,11 @@
           }
 
         </div>
-
       </div>
     </div>
   </header>
 
-  <!-- ==============================================
-       SIDE MENU — القائمة الجانبية (تحتوي الملف الشخصي، الإشعارات، تسجيل الخروج)
-       ============================================== -->
+  <!-- SIDE MENU -->
   @if (currentUser() && sideMenuOpen()) {
     <div class="fixed inset-0 z-[55] bg-slate-900/50 backdrop-blur-sm animate-fade-in" (click)="sideMenuOpen.set(false)" id="side-menu-backdrop"></div>
     <aside class="fixed top-0 right-0 z-[56] h-full w-[300px] bg-white shadow-2xl flex flex-col animate-fade-in" id="side-menu-panel" dir="rtl">
@@ -261,7 +202,7 @@
     </aside>
   }
 
-  <!-- SECONDARY AGENCY SUB-HEADER BAR (يُخفى على الموبايل لأن الـ bottom nav يغطي هذا الدور) -->
+  <!-- SECONDARY AGENCY SUB-HEADER BAR -->
   @if (currentUser() && activeTab() === 'agency') {
     <div class="hidden lg:block bg-white border-b border-slate-100 shadow-sm sticky top-[72px] z-30" id="agency-subnav">
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -277,7 +218,6 @@
               <span>البحث والرحلات</span>
             </button>
 
-            <!-- ملاحظة رقم 6: تسمية أوضح لوكلاء السفر -->
             <button (click)="userView.set('bookings')"
                     [class.border-amber-500]="userView() === 'bookings'"
                     [class.text-slate-900]="userView() === 'bookings'"
@@ -358,7 +298,7 @@
           </div>
         }
 
-        @if (userView() === 'register' && currentUser()) {
+        @if (userView() === 'register') {
           <div class="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden p-8 space-y-6">
             <div class="text-center space-y-2">
               <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-900 text-amber-400 shadow-inner">
@@ -410,8 +350,7 @@
           <!-- HERO + FLOATING SEARCH CARD -->
           <div class="relative" id="agency-hero-wrapper">
 
-            <!-- HERO BANNER — طبقة تعتيم أقوى (ملاحظة رقم 3) -->
-            <!-- استبدل الصورة أدناه بصورة احترافية تُظهر مسار إقلاع→هبوط عند توفرها -->
+            <!-- HERO BANNER -->
             <div class="relative overflow-hidden rounded-3xl bg-slate-950 text-white shadow-2xl h-[320px] sm:h-[400px]" id="agency-hero">
               <img src="https://img.magnific.com/free-photo/view-3d-airplane-with-wings-engine_23-2151022210.jpg?semt=ais_hybrid&w=740&q=80"
                    alt="طائرة برق بزنس"
@@ -433,7 +372,7 @@
               </div>
             </div>
 
-            <!-- FLOATING SEARCH FORM — أسلوب Google Flights (ملاحظة رقم 4) -->
+            <!-- FLOATING SEARCH FORM -->
             <div class="bg-white rounded-3xl border border-slate-100 shadow-xl p-4 sm:p-5 -mt-10 sm:-mt-14 relative z-20 max-w-5xl mx-auto" id="search-container">
 
               <!-- Trip type tabs -->
@@ -453,7 +392,7 @@
 
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
 
-                  <!-- Origin + Swap button -->
+                  <!-- Origin -->
                   <div class="lg:col-span-1 relative">
                     <app-airport-select
                       id="origin-select"
@@ -464,7 +403,7 @@
                     </app-airport-select>
                   </div>
 
-                  <!-- Swap icon (بين الحقلين) -->
+                  <!-- Swap icon -->
                   <div class="hidden lg:flex items-end justify-center pb-3 -mx-4 z-10">
                     <button type="button" (click)="swapOriginDestination()" title="تبديل من / إلى"
                             class="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition cursor-pointer">
@@ -494,7 +433,7 @@
                     </div>
                   </div>
 
-                  <!-- Return Date (شرطي: يظهر فقط عند ذهاب وعودة) -->
+                  <!-- Return Date -->
                   @if (tripType() === 'roundtrip') {
                     <div class="space-y-1.5 lg:col-span-1">
                       <span class="flex items-center gap-1 justify-end text-xs font-bold text-slate-500" dir="rtl">
@@ -533,7 +472,6 @@
 
                 </div>
 
-                <!-- زر بحث أكبر وأوضح (ذهبي) -->
                 <button type="submit" [disabled]="searchLoading()"
                         class="mt-4 w-full h-[54px] flex items-center justify-center gap-2 rounded-2xl bg-amber-500 text-slate-900 font-black text-sm shadow-lg shadow-amber-500/20 hover:bg-amber-600 active:scale-[0.99] transition disabled:opacity-50 cursor-pointer"
                         id="search-submit-btn">
@@ -549,7 +487,6 @@
                   }
                 </button>
 
-                <!-- Sandbox Route Hint -->
                 <div class="flex items-start gap-3 rounded-2xl bg-slate-50 border border-slate-100 p-3 mt-4 justify-end" dir="rtl">
                   <span class="text-lg">💡</span>
                   <div class="text-[11px] leading-relaxed text-slate-600 text-right">
@@ -561,7 +498,7 @@
             </div>
           </div>
 
-          <!-- بطاقات الحالة المالية والتشغيلية (ملاحظة رقم 7) -->
+          <!-- بطاقات الحالة المالية والتشغيلية -->
           <div class="max-w-6xl mx-auto px-1" id="operational-stats-section">
             <div class="grid grid-cols-2 lg:grid-cols-6 gap-3" dir="rtl">
 
@@ -597,22 +534,6 @@
                 <strong class="block text-lg font-black text-slate-800 font-sans">{{ todayStats().ticketsIssued }}</strong>
               </div>
 
-              <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-1">
-                <div class="flex items-center gap-1.5 text-amber-600">
-                  <mat-icon class="text-base">pending_actions</mat-icon>
-                  <span class="text-[10px] font-bold text-slate-400">مبالغ مستحقة</span>
-                </div>
-                <strong class="block text-lg font-black text-amber-600 font-sans">${{ todayStats().amountsDue.toFixed(2) }}</strong>
-              </div>
-
-              <div class="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-1">
-                <div class="flex items-center gap-1.5 text-rose-500">
-                  <mat-icon class="text-base">assignment_return</mat-icon>
-                  <span class="text-[10px] font-bold text-slate-400">عمليات استرداد</span>
-                </div>
-                <strong class="block text-lg font-black text-rose-500 font-sans">{{ todayStats().refunds }}</strong>
-              </div>
-
             </div>
           </div>
 
@@ -637,50 +558,6 @@
                   </div>
                 </button>
               }
-            </div>
-          </div>
-
-          <!-- ADVANTAGES / MARKETING SECTION -->
-          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-6xl mx-auto px-1" id="agency-features-grid" dir="rtl">
-
-            <div class="flex flex-col items-center text-center gap-2 p-4">
-              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-500 shadow-inner">
-                <mat-icon class="text-2xl">military_tech</mat-icon>
-              </div>
-              <h3 class="text-sm font-black text-slate-900">ضمان أفضل سعر</h3>
-              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">إن وجدت نفس الرحلة بسعر أقل بمكان آخر، تواصل معنا وسنطابق السعر لك فوراً.</p>
-            </div>
-
-            <div class="flex flex-col items-center text-center gap-2 p-4">
-              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50 text-slate-700 shadow-inner">
-                <mat-icon class="text-2xl">credit_card</mat-icon>
-              </div>
-              <h3 class="text-sm font-black text-slate-900">استرجاع وإلغاء الحجوزات</h3>
-              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">هل تم إلغاء رحلة عميلك؟ فريقنا يغطي طلبات الاسترجاع الفورية بكل سهولة.</p>
-            </div>
-
-            <div class="flex flex-col items-center text-center gap-2 p-4">
-              <div class="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-500 shadow-inner">
-                <mat-icon class="text-2xl">support_agent</mat-icon>
-              </div>
-              <h3 class="text-sm font-black text-slate-900">دعم فني على مدار الساعة</h3>
-              <p class="text-xs text-slate-500 leading-relaxed max-w-[220px]">فريق المحاسبة والدعم متاح طوال الوقت لمراجعة الإيصالات وتأكيد الحجوزات.</p>
-            </div>
-
-          </div>
-
-          <!-- MOBILE APP PROMO BANNER -->
-          <div class="relative overflow-hidden rounded-3xl bg-slate-900 text-white shadow-xl max-w-6xl mx-auto" id="app-promo-banner">
-            <div class="relative z-10 flex flex-col sm:flex-row items-center justify-between gap-6 p-8 sm:p-10 text-right" dir="rtl">
-              <div class="space-y-3 max-w-md">
-                <h3 class="text-xl sm:text-2xl font-black leading-snug">حمّل تطبيق برق للوكلاء واحجز أينما كنت</h3>
-                <p class="text-sm text-white/70 leading-relaxed">تابع حجوزات عملائك، اشحن محفظتك، وأصدر التذاكر مباشرة من هاتفك أينما كنت.</p>
-                <button type="button" class="inline-flex items-center gap-2 rounded-xl bg-amber-500 text-slate-900 font-black px-5 py-3 text-xs shadow-md hover:bg-amber-400 transition cursor-pointer">
-                  <mat-icon class="text-base">download</mat-icon>
-                  <span>تحميل التطبيق الآن</span>
-                </button>
-              </div>
-              <mat-icon class="text-white/10 text-8xl -rotate-45 hidden sm:block">flight</mat-icon>
             </div>
           </div>
 
@@ -864,467 +741,21 @@
         </div>
       }
 
-      <!-- ADVANTAGES / MARKETING SECTION (home extra) -->
-      @if (userView() === 'home') {
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 pt-6" id="agency-features-grid-2">
-
-          <div class="bg-white border border-slate-100 p-6 rounded-3xl space-y-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-amber-400 shadow-inner">
-              <mat-icon>security</mat-icon>
-            </div>
-            <h3 class="text-base font-black text-slate-900">سعر مغلق ومحمي من Duffel</h3>
-            <p class="text-xs text-slate-500 leading-relaxed">بمجرد إجراء الحجز المؤقت، نضمن لك حماية كاملة لسعر الصرف والمقاعد من شركة الطيران طوال فترة الصلاحية المحددة.</p>
-          </div>
-
-          <div class="bg-white border border-slate-100 p-6 rounded-3xl space-y-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-amber-400 shadow-inner">
-              <mat-icon>wallet</mat-icon>
-            </div>
-            <h3 class="text-base font-black text-slate-900">المحفظة المشحونة مسبقاً B2B</h3>
-            <p class="text-xs text-slate-500 leading-relaxed">اشحن محفظة مكتبك السياحي عبر التحويل البنكي الفوري لتتمكن من إصدار تذاكر السفر لعملائك لحظياً والدفع المباشر دون تأخير.</p>
-          </div>
-
-          <div class="bg-white border border-slate-100 p-6 rounded-3xl space-y-3">
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-amber-400 shadow-inner">
-              <mat-icon>support_agent</mat-icon>
-            </div>
-            <h3 class="text-base font-black text-slate-900">مراجعة فورية للإيصالات</h3>
-            <p class="text-xs text-slate-500 leading-relaxed">فريق المحاسبة والمالية لدينا متاح طوال الساعة للتحقق من إيصالات السداد المرفوعة وتأكيد الحجوزات أو شحن الرصيد بأمان.</p>
-          </div>
-
-        </div>
+      <!-- 2. BOOKINGS LIST COMPONENT -->
+      @if (userView() === 'bookings' || userView() === 'order-details') {
+        <app-bookings-list></app-bookings-list>
       }
 
-      <!-- 2. إدارة الحجوزات (كان: تتبع الحجوزات) -->
-      @if (userView() === 'bookings') {
-        <div class="space-y-6 animate-fade-in" id="agency-bookings-view">
-
-          <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h1 class="text-xl font-black text-slate-900">إدارة الحجوزات</h1>
-              <p class="text-xs text-slate-400 mt-1">تتبع حالة حجوزات عملائك، ارفع إيصالات الدفع لتثبيت الحجز، أو استعرض تذاكرك الإلكترونية المعتمدة.</p>
-            </div>
-            <button (click)="fetchOrders()" class="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 text-xs transition cursor-pointer shrink-0">
-              <mat-icon>refresh</mat-icon>
-              <span>تحديث القائمة</span>
-            </button>
-          </div>
-
-          <!-- ============ حالة التحميل (موحّدة لكل الشاشات) ============ -->
-          @if (ordersLoading() && ordersList().length === 0) {
-            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-12 text-center">
-              <svg class="animate-spin h-8 w-8 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p class="text-sm text-slate-400 mt-3 font-semibold">جاري استرجاع تفاصيل الحجوزات...</p>
-            </div>
-          }
-
-          <!-- ============ حالة عدم وجود حجوزات (موحّدة) ============ -->
-          @else if (ordersList().length === 0) {
-            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-16 text-center space-y-4">
-              <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 shadow-inner">
-                <mat-icon class="text-4xl">airplane_ticket</mat-icon>
-              </div>
-              <h3 class="text-lg font-black text-slate-800">لا توجد حجوزات مسجلة لمكتبك حالياً</h3>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto">عند قيامك بالبحث وحجز أي رحلة لعملائك بالدفع الآجل أو المباشر ستظهر تفاصيلها وتذاكرها هنا فوراً.</p>
-              <button (click)="userView.set('home')" class="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-5 py-2.5 text-xs font-black text-slate-900 hover:bg-amber-600 transition shadow-md cursor-pointer">
-                <mat-icon class="text-sm">search</mat-icon>
-                <span>ابحث واحجز رحلة الآن</span>
-              </button>
-            </div>
-          }
-
-          @else {
-
-            <!-- ==========================================================
-                 نسخة الموبايل: بطاقات (Cards) — تظهر فقط أقل من lg
-                 ========================================================== -->
-            <div class="lg:hidden space-y-4" id="bookings-mobile-cards">
-              @for (order of ordersList(); track order.id) {
-                <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden" dir="rtl">
-
-                  <!-- رأس البطاقة: الحالة + مرجع الحجز -->
-                  <div class="flex items-center justify-between px-4 pt-4">
-                    <span class="font-sans font-black text-slate-900 text-base tracking-wider">
-                      {{ order.booking_reference || 'قيد المزامنة' }}
-                    </span>
-
-                    @if (order.status === 'confirmed') {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-600 border border-emerald-100">
-                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                        صادرة ✅
-                      </span>
-                    } @else if (order.status === 'cancelled') {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-[11px] font-bold text-rose-600 border border-rose-100">
-                        ملغي ❌
-                      </span>
-                    } @else {
-                      <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-700 border border-amber-100">
-                        <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
-                        حجز مؤقت
-                      </span>
-                    }
-                  </div>
-
-                  <!-- خط السير والناقل -->
-                  <div class="px-4 pt-3">
-                    <div class="flex items-center gap-2">
-                      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-slate-500 border border-slate-100">
-                        <mat-icon class="text-base">flight</mat-icon>
-                      </div>
-                      <div class="min-w-0">
-                        <span class="block font-extrabold text-slate-800 text-sm truncate">{{ order.route }}</span>
-                        <span class="text-[11px] text-slate-500 block truncate">{{ order.owner_name }}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- الراكب الرئيسي -->
-                  @if (order.passengers && order.passengers[0]; as passenger) {
-                    <div class="px-4 pt-3 flex items-center gap-2 text-xs">
-                      <mat-icon class="text-slate-300 text-base">person</mat-icon>
-                      <span class="font-bold text-slate-700">{{ passenger.given_name }} {{ passenger.family_name }}</span>
-                      <span class="text-slate-300">•</span>
-                      <span class="text-slate-400 font-mono truncate">{{ passenger.email }}</span>
-                    </div>
-                  }
-
-                  <!-- التكلفة + مهلة الدفع -->
-                  <div class="px-4 pt-3 flex items-center justify-between">
-                    <div>
-                      <span class="text-[10px] text-slate-400 block">التكلفة الإجمالية</span>
-                      <span class="font-sans font-black text-slate-900 text-lg">
-                        {{ order.total_amount | currency: order.total_currency : 'symbol' : '1.2-2' }}
-                      </span>
-                    </div>
-
-                    @if (order.status === 'awaiting_payment' && order.payment_required_by) {
-                      <div class="text-left">
-                        <span class="text-[10px] text-amber-600 block">الوقت المتبقي</span>
-                        <span class="text-xs font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-lg px-2 py-1 font-sans">
-                          {{ getCountdown(order.payment_required_by) }}
-                        </span>
-                      </div>
-                    }
-                  </div>
-
-                  <!-- شريط الإجراءات السفلي -->
-                  <div class="mt-4 border-t border-slate-100 grid gap-px bg-slate-100"
-                       [class.grid-cols-3]="order.status === 'awaiting_payment'"
-                       [class.grid-cols-2]="order.status !== 'awaiting_payment'">
-
-                    <button (click)="viewOrderDetails(order.id)"
-                            class="bg-white flex flex-col items-center justify-center gap-1 py-3 text-slate-600 active:bg-slate-50 transition cursor-pointer">
-                      <mat-icon class="text-lg">visibility</mat-icon>
-                      <span class="text-[10px] font-bold">التفاصيل</span>
-                    </button>
-
-                    <button (click)="refreshOrder(order)"
-                            class="bg-white flex flex-col items-center justify-center gap-1 py-3 text-slate-600 active:bg-slate-50 transition cursor-pointer">
-                      <mat-icon class="text-lg">sync</mat-icon>
-                      <span class="text-[10px] font-bold">تحديث</span>
-                    </button>
-
-                    @if (order.status === 'awaiting_payment') {
-                      @if (!order.receipt_number) {
-                        <button (click)="openReceiptModal(order)"
-                                id="upload-receipt-btn-mobile-{{ order.id }}"
-                                class="bg-amber-500 flex flex-col items-center justify-center gap-1 py-3 text-slate-900 active:bg-amber-600 transition cursor-pointer">
-                          <mat-icon class="text-lg">upload_file</mat-icon>
-                          <span class="text-[10px] font-black">رفع إيصال</span>
-                        </button>
-                      } @else {
-                        <button (click)="cancelOrder(order)"
-                                class="bg-white flex flex-col items-center justify-center gap-1 py-3 text-rose-500 active:bg-rose-50 transition cursor-pointer">
-                          <mat-icon class="text-lg">delete_outline</mat-icon>
-                          <span class="text-[10px] font-bold">إلغاء</span>
-                        </button>
-                      }
-                    }
-                  </div>
-
-                  <!-- تنبيه: إيصال قيد المراجعة / تذاكر جاهزة -->
-                  @if (order.status === 'awaiting_payment' && order.receipt_number) {
-                    <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] font-bold text-slate-500">
-                      <mat-icon class="text-sm">hourglass_empty</mat-icon>
-                      <span>بانتظار مراجعة الإدارة لإصدار التذاكر</span>
-                    </div>
-                  } @else if (order.status === 'confirmed') {
-                    <div class="px-4 py-2.5 bg-emerald-50 border-t border-emerald-100 flex items-center justify-center gap-1.5 text-[11px] font-black text-emerald-700">
-                      <mat-icon class="text-sm">local_activity</mat-icon>
-                      <span>التذاكر الإلكترونية جاهزة</span>
-                    </div>
-                  }
-
-                </div>
-              }
-            </div>
-
-            <!-- ==========================================================
-                 نسخة الديسكتوب: جدول — يظهر فقط من lg فأكبر
-                 ========================================================== -->
-            <div class="hidden lg:block bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-              <div class="overflow-x-auto">
-                <table class="w-full text-right border-collapse">
-                  <thead>
-                    <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase">
-                      <th class="p-4">مرجع الحجز / Booking Ref</th>
-                      <th class="p-4">الناقل وخط السير</th>
-                      <th class="p-4">الراكب الرئيسي</th>
-                      <th class="p-4 text-left">التكلفة</th>
-                      <th class="p-4 text-center">حالة السداد</th>
-                      <th class="p-4 text-center">التحقق المالي والتحكم</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100 text-sm">
-                    @for (order of ordersList(); track order.id) {
-                      <tr class="hover:bg-slate-50/50 transition">
-
-                        <td class="p-4">
-                          <span class="block font-sans font-black text-slate-900 text-base tracking-wider">{{ order.booking_reference || 'قيد المزامنة' }}</span>
-                          <span class="text-[9px] text-slate-400 font-mono block mt-0.5">رقم الحجز: {{ order.id }}</span>
-                        </td>
-
-                        <td class="p-4">
-                          <span class="block font-extrabold text-slate-800">{{ order.route }}</span>
-                          <span class="text-[10px] text-slate-500 block mt-0.5">{{ order.owner_name }}</span>
-                        </td>
-
-                        <td class="p-4">
-                          @if (order.passengers && order.passengers[0]; as passenger) {
-                            <span class="block font-bold text-slate-700">{{ passenger.given_name }} {{ passenger.family_name }}</span>
-                            <span class="text-[10px] text-slate-400 font-mono block mt-0.5">{{ passenger.email }}</span>
-                          }
-                        </td>
-
-                        <td class="p-4 text-left font-sans font-extrabold text-slate-900">
-                          {{ order.total_amount | currency: order.total_currency : 'symbol' : '1.2-2' }}
-                        </td>
-
-                        <td class="p-4 text-center">
-                          <div class="inline-flex flex-col items-center gap-1">
-                            @if (order.status === 'confirmed') {
-                              <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">
-                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                                تم إصدار التذكرة ✅
-                              </span>
-                            } @else if (order.status === 'cancelled') {
-                              <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">
-                                ملغي ❌
-                              </span>
-                            } @else {
-                              <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">
-                                <span class="h-1.5 w-1.5 rounded-full bg-amber-500 animate-ping"></span>
-                                حجز مؤقت (Hold)
-                              </span>
-                              @if (order.payment_required_by) {
-                                <span class="text-[10px] text-amber-700 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100 font-sans">
-                                  {{ getCountdown(order.payment_required_by) }}
-                                </span>
-                              }
-                            }
-                          </div>
-                        </td>
-
-                        <td class="p-4 text-center">
-                          <div class="flex items-center justify-center gap-2">
-
-                            <button (click)="viewOrderDetails(order.id)" class="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold px-3 py-1.5 text-xs transition cursor-pointer" title="تفاصيل الحجز وربح المكتب">
-                              <mat-icon class="text-xs">visibility</mat-icon>
-                              <span>التفاصيل</span>
-                            </button>
-
-                            <button (click)="refreshOrder(order)" class="p-2 rounded-xl text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition cursor-pointer" title="تحديث السعر وحالة الحجز">
-                              <mat-icon class="text-lg">sync</mat-icon>
-                            </button>
-
-                            @if (order.status === 'confirmed') {
-                              <div class="bg-emerald-50 text-emerald-700 rounded-xl px-3 py-1.5 text-xs font-extrabold flex items-center gap-1" id="tickets-issued-indicator-{{ order.id }}">
-                                <mat-icon class="text-sm">local_activity</mat-icon>
-                                <span>التذاكر الإلكترونية جاهزة</span>
-                              </div>
-                            } @else if (order.status === 'awaiting_payment') {
-
-                              @if (!order.receipt_number) {
-                                <button (click)="openReceiptModal(order)"
-                                        class="flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold px-3 py-2 text-xs shadow-sm transition active:scale-95 cursor-pointer"
-                                        id="upload-receipt-btn-{{ order.id }}">
-                                  <mat-icon class="text-sm">upload_file</mat-icon>
-                                  <span>رفع إيصال السداد</span>
-                                </button>
-                              } @else {
-                                <div class="bg-slate-50 border border-slate-200 text-slate-600 rounded-xl px-3 py-1.5 text-xs font-bold flex items-center gap-1" id="receipt-uploaded-feedback-{{ order.id }}">
-                                  <mat-icon class="text-sm">hourglass_empty</mat-icon>
-                                  <span>بانتظار مراجعة الإدارة لإصدار التذاكر</span>
-                                </div>
-                              }
-
-                              <button (click)="cancelOrder(order)" class="p-2 rounded-xl text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition cursor-pointer" title="إلغاء هذا الحجز المؤقت">
-                                <mat-icon class="text-lg">delete_outline</mat-icon>
-                              </button>
-                            }
-
-                          </div>
-                        </td>
-
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-          }
-
-        </div>
-      }
-
-      <!-- 3. WALLET & BANK DEPOSIT VIEW -->
+      <!-- 3. WALLET PANEL COMPONENT -->
       @if (userView() === 'wallet') {
-        <div class="space-y-6 animate-fade-in" id="agency-wallet-view">
-
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <div class="bg-slate-900 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden flex flex-col justify-between min-h-[220px]">
-              <div class="absolute inset-0 bg-cover bg-center opacity-10" style="background-image: url('https://picsum.photos/seed/money/400/300');"></div>
-
-              <div class="flex justify-between items-start relative z-10">
-                <div>
-                  <span class="text-xs text-slate-300 font-bold block mb-1">محفظة مكتب السياحة</span>
-                  <strong class="text-lg font-black block">{{ currentUser()?.name }}</strong>
-                </div>
-                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-md">
-                  <mat-icon class="text-amber-400 text-2xl">account_balance_wallet</mat-icon>
-                </div>
-              </div>
-
-              <div class="space-y-1 relative z-10">
-                <span class="text-[11px] text-emerald-400 font-extrabold tracking-wider uppercase block">الرصيد النشط والجاهز للدفع المباشر</span>
-                <span class="text-4xl font-black font-sans tracking-tight block">${{ currentUser()?.wallet_balance?.toFixed(2) }} <span class="text-lg font-light text-slate-300">USD</span></span>
-                <span class="text-[11px] text-slate-400 block pt-1">الحد الائتماني المتبقي: <strong class="text-slate-200">${{ creditLimitRemaining().toFixed(2) }}</strong></span>
-              </div>
-
-              <div class="text-[10px] text-slate-400 border-t border-white/10 pt-3 relative z-10 flex items-center gap-1">
-                <mat-icon class="text-xs">info</mat-icon>
-                <span>يتم خصم تكلفة الحجز المباشر (Instant Booking) فوراً من هذا الرصيد لإصدار التذكرة.</span>
-              </div>
-            </div>
-
-            <div class="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
-              <div class="flex items-center gap-2">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-700 shadow-inner">
-                  <mat-icon>account_balance</mat-icon>
-                </div>
-                <div>
-                  <h3 class="text-base font-black text-slate-900 leading-none">معلومات التحويل البنكي</h3>
-                  <span class="text-[10px] text-slate-400">يرجى تحويل مبلغ الشحن إلى الحساب التالي</span>
-                </div>
-              </div>
-
-              <div class="space-y-2 text-xs">
-                <div class="bg-slate-50 rounded-2xl p-4 space-y-3 border border-slate-100 font-mono text-slate-700">
-                  <div class="flex justify-between"><span class="text-slate-400 font-sans">اسم البنك:</span> <strong class="text-slate-950 font-sans">البنك الأهلي التجاري (SNB)</strong></div>
-                  <div class="flex justify-between"><span class="text-slate-400 font-sans">اسم الحساب:</span> <strong class="text-slate-950 font-sans">شركة سكاي بلان المحدودة / برق LLC</strong></div>
-                  <div class="flex justify-between"><span class="text-slate-400 font-sans">رقم الحساب (بمكي):</span> <strong class="text-slate-950 text-sm font-sans select-all">966-2244-6688-22</strong></div>
-                  <div class="flex justify-between"><span class="text-slate-400 font-sans">رقم الآيبان (IBAN):</span> <strong class="text-slate-950 text-xs select-all">SA93400000009662244668822</strong></div>
-                </div>
-                <p class="text-[10px] text-slate-400 leading-relaxed">⚠️ يرجى كتابة اسم مكتبك في تفاصيل التحويل البنكي ورفع إيصال التحويل بشكل صحيح لتسهيل موافقة المحاسبة.</p>
-              </div>
-            </div>
-
-            <div class="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm space-y-4">
-              <div class="flex items-center gap-2">
-                <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-50 text-slate-700 shadow-inner">
-                  <mat-icon>add_to_photos</mat-icon>
-                </div>
-                <div>
-                  <h3 class="text-base font-black text-slate-900 leading-none">إرسال إشعار إيداع رصيد</h3>
-                  <span class="text-[10px] text-slate-400 font-sans">تأكيد عملية التحويل وشحن المحفظة</span>
-                </div>
-              </div>
-
-              <form [formGroup]="depositForm" (ngSubmit)="submitWalletDeposit()" class="space-y-4" id="wallet-deposit-form">
-                <div class="grid grid-cols-2 gap-3">
-                  <div class="space-y-1">
-                    <span class="block text-[11px] font-bold text-slate-500">مبلغ التحويل ($ USD)</span>
-                    <input type="number" formControlName="amount" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-sans font-extrabold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                  </div>
-                  <div class="space-y-1">
-                    <span class="block text-[11px] font-bold text-slate-500">رقم التحويل / الإسناد</span>
-                    <input type="text" formControlName="receiptNumber" placeholder="مثال: TXN987251" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                  </div>
-                </div>
-
-                <div class="border-2 border-dashed border-slate-200 rounded-2xl p-4 text-center space-y-1.5 hover:bg-slate-50/50 cursor-pointer transition">
-                  <mat-icon class="text-slate-400">cloud_upload</mat-icon>
-                  <p class="text-xs font-bold text-slate-700">اسحب أو حدد صورة إيصال التحويل البنكي</p>
-                  <span class="text-[10px] text-slate-400 block">صيغة JPG, PNG (الحد الأقصى 5 ميجابايت)</span>
-                </div>
-
-                <button type="submit" class="w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 text-xs shadow-md transition active:scale-95 cursor-pointer">
-                  تأكيد الإرسال للإدارة والتحقق
-                </button>
-              </form>
-            </div>
-
-          </div>
-
-          <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-100">
-              <h3 class="text-base font-black text-slate-900">سجل عمليات شحن المحفظة (التحويلات)</h3>
-            </div>
-
-            @if (userDepositsList().length === 0) {
-              <div class="p-12 text-center text-slate-400 space-y-2">
-                <mat-icon class="text-3xl">account_balance_wallet</mat-icon>
-                <p class="text-xs font-medium">لم يتم تسجيل أي عمليات إيداع بنكي سابقة لهذا الحساب.</p>
-              </div>
-            } @else {
-              <div class="overflow-x-auto">
-                <table class="w-full text-right border-collapse text-sm">
-                  <thead>
-                    <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
-                      <th class="p-4">رقم العملية / ID</th>
-                      <th class="p-4">تاريخ الإيداع</th>
-                      <th class="p-4">رقم التحويل البنكي</th>
-                      <th class="p-4 text-left">المبلغ المودع</th>
-                      <th class="p-4 text-center">الحالة</th>
-                    </tr>
-                  </thead>
-                  <tbody class="divide-y divide-slate-100">
-                    @for (dep of userDepositsList(); track dep.id) {
-                      <tr class="hover:bg-slate-50/50 transition">
-                        <td class="p-4 font-mono text-xs text-slate-400">{{ dep.id }}</td>
-                        <td class="p-4 text-slate-600 font-semibold">{{ dep.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
-                        <td class="p-4 font-mono font-bold text-slate-800">{{ dep.receipt_number }}</td>
-                        <td class="p-4 text-left font-sans font-black text-emerald-600">${{ dep.amount.toFixed(2) }} USD</td>
-                        <td class="p-4 text-center">
-                          @if (dep.status === 'approved') {
-                            <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">مكتمل ومقبول ✅</span>
-                          } @else if (dep.status === 'rejected') {
-                            <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">مرفوض ❌</span>
-                          } @else {
-                            <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100 animate-pulse">قيد المراجعة والتحقق</span>
-                          }
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              </div>
-            }
-          </div>
-
-        </div>
+        <app-wallet-panel></app-wallet-panel>
       }
 
       <!-- 4. NOTIFICATIONS VIEW -->
       @if (userView() === 'notifications') {
-        <div class="space-y-6 max-w-4xl mx-auto animate-fade-in" id="agency-notifications-view">
+        <div class="space-y-6 max-w-4xl mx-auto animate-fade-in text-right" id="agency-notifications-view">
 
-          <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex justify-between items-center">
+          <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex justify-between items-center" dir="rtl">
             <div>
               <h1 class="text-xl font-black text-slate-900 font-sans">تنبيهات وإشعارات النظام</h1>
               <p class="text-xs text-slate-400 mt-1">تابع إشعارات تذاكر السفر وإيداعات المحفظة ومستجدات الحجوزات أولاً بأول.</p>
@@ -1334,7 +765,7 @@
             </button>
           </div>
 
-          <div class="space-y-3">
+          <div class="space-y-3" dir="rtl">
             @if (notificationsList().length === 0) {
               <div class="bg-white rounded-3xl p-12 text-center text-slate-400 space-y-2 border border-slate-100">
                 <mat-icon class="text-4xl text-slate-300">notifications_off</mat-icon>
@@ -1372,9 +803,9 @@
 
       <!-- 5. PROFILE VIEW -->
       @if (userView() === 'profile') {
-        <div class="space-y-6 max-w-3xl mx-auto animate-fade-in" id="agency-profile-view">
+        <div class="space-y-6 max-w-3xl mx-auto animate-fade-in text-right" id="agency-profile-view">
 
-          <div class="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden">
+          <div class="bg-white rounded-3xl border border-slate-100 shadow-xl overflow-hidden" dir="rtl">
             <div class="h-32 bg-slate-900 relative">
               <div class="absolute inset-0 bg-cover bg-center opacity-30" style="background-image: url('https://picsum.photos/seed/viewsky/800/200');"></div>
             </div>
@@ -1437,697 +868,27 @@
     }
 
     <!-- ==============================================
-         VIEW C: ADMIN DASHBOARD
+         VIEW C: ADMIN DASHBOARD (ADMIN COMPONENT)
          ============================================== -->
     @if (currentUser() && activeTab() === 'admin') {
-      <div class="space-y-8 animate-fade-in" id="admin-view-panel">
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5" id="admin-summary-stats">
-
-          <div class="bg-white border border-slate-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-            <div>
-              <span class="text-xs text-slate-400 font-bold block mb-1">التحويلات البنكية المعلقة للإيداع</span>
-              <strong class="text-2xl font-black text-slate-800 font-sans tracking-tight">
-                {{ allDepositsList().length }} طلبات
-              </strong>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-700 shadow-inner">
-              <mat-icon>account_balance</mat-icon>
-            </div>
-          </div>
-
-          <div class="bg-white border border-slate-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-            <div>
-              <span class="text-xs text-slate-400 font-bold block mb-1">إجمالي الحجوزات بالنظام</span>
-              <strong class="text-2xl font-black text-slate-900 font-sans tracking-tight">
-                {{ adminOrdersList().length }} حجزاً
-              </strong>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-amber-400 shadow-inner">
-              <mat-icon>flight_takeoff</mat-icon>
-            </div>
-          </div>
-
-          <div class="bg-white border border-slate-100 rounded-3xl p-6 flex justify-between items-center shadow-sm">
-            <div>
-              <span class="text-xs text-slate-400 font-bold block mb-1">الحجوزات المؤقتة المعلقة (Hold)</span>
-              <strong class="text-2xl font-black text-amber-600 font-sans tracking-tight">
-                {{ ordersList().length }} طلبات
-              </strong>
-            </div>
-            <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 shadow-inner">
-              <mat-icon>hourglass_empty</mat-icon>
-            </div>
-          </div>
-
-        </div>
-
-        <div class="bg-white border border-slate-100 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6 text-right" id="admin-markup-config-card" dir="rtl">
-          <div class="space-y-1.5">
-            <span class="inline-flex rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-black text-amber-400">هامش ربح المنصة الموحد</span>
-            <h3 class="text-base font-black text-slate-900">التحكم في نسبة هامش ربح المنصة</h3>
-            <p class="text-xs text-slate-400 max-w-xl leading-relaxed">تُضاف هذه النسبة تلقائياً وبشكل آلي على جميع أسعار رحلات الطيران المسترجعة من دافيل (Duffel API) وتُعرض للوكلاء كجزء من السعر الإجمالي، وهي تمثل صافي ربح المنصة.</p>
-          </div>
-
-          <div class="flex items-center gap-3 w-full md:w-auto shrink-0 bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-            <div class="flex items-center gap-2">
-              <input type="number"
-                     [value]="officeMarkupPercentage()"
-                     (input)="officeMarkupPercentage.set($any($event.target).value)"
-                     min="0" max="100" step="0.5"
-                     class="w-24 rounded-xl border border-slate-200 bg-white px-3 py-2 text-center text-sm font-black focus:border-amber-500 focus:outline-none transition font-sans"
-                     id="admin-markup-input">
-              <span class="text-xs font-bold text-slate-600">%</span>
-            </div>
-
-            <button (click)="saveSettings()" [disabled]="settingsSaving()" class="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold px-4 py-2 text-xs flex items-center gap-1 cursor-pointer transition shadow-sm active:scale-95">
-              <mat-icon class="text-xs">save</mat-icon>
-              <span>{{ settingsSaving() ? 'جاري الحفظ...' : 'حفظ النسبة' }}</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 1. DEPOSITS & WALLET RECONCILIATION -->
-        <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden" id="admin-deposits-card">
-          <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h3 class="text-base font-black text-slate-900">مراجعة التحويلات البنكية وشحن محافظ الوكلاء (الودائع)</h3>
-              <p class="text-[10px] text-slate-500 mt-1">راجع إيصالات التحويل، طابق رقم العملية مع حسابات البنك، ثم وافق لشحن رصيد الوكيل فوراً.</p>
-            </div>
-            <button (click)="fetchAdminDeposits()" class="flex items-center gap-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 text-xs cursor-pointer">
-              <mat-icon class="text-sm">sync</mat-icon>
-              <span>تحديث الإيداعات</span>
-            </button>
-          </div>
-
-          @if (adminDepositsLoading() && allDepositsList().length === 0) {
-            <div class="p-12 text-center text-slate-400">
-              <svg class="animate-spin h-6 w-6 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p class="text-xs font-bold mt-2">جاري استرجاع الحوالات البنكية...</p>
-            </div>
-          } @else if (allDepositsList().length === 0) {
-            <div class="p-12 text-center text-slate-400 space-y-2">
-              <mat-icon class="text-3xl text-slate-300">account_balance_wallet</mat-icon>
-              <p class="text-xs font-bold">لا توجد عمليات إيداع بنكي مسجلة في انتظار المراجعة حالياً.</p>
-            </div>
-          } @else {
-            <div class="overflow-x-auto">
-              <table class="w-full text-right border-collapse text-sm">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
-                    <th class="p-4">اسم ومكتب العميل</th>
-                    <th class="p-4">تاريخ الإرسال</th>
-                    <th class="p-4">رقم إيصال التحويل</th>
-                    <th class="p-4 text-left">المبلغ المطلوب</th>
-                    <th class="p-4 text-center">حالة التحقق</th>
-                    <th class="p-4 text-center">التحكم والإجراء المالي</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  @for (deposit of allDepositsList(); track deposit.id) {
-                    <tr class="hover:bg-slate-50/50 transition">
-
-                      <td class="p-4">
-                        <strong class="block text-slate-900">{{ deposit.user_name }}</strong>
-                        <span class="text-[10px] text-slate-400 font-mono">{{ deposit.user_email }}</span>
-                      </td>
-
-                      <td class="p-4 text-slate-500 font-semibold">{{ deposit.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
-
-                      <td class="p-4 font-mono font-black text-slate-800">{{ deposit.receipt_number }}</td>
-
-                      <td class="p-4 text-left font-sans font-black text-emerald-600">${{ deposit.amount.toFixed(2) }} USD</td>
-
-                      <td class="p-4 text-center">
-                        @if (deposit.status === 'approved') {
-                          <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">مقبول ومضاف ✅</span>
-                        } @else if (deposit.status === 'rejected') {
-                          <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">مرفوض ❌</span>
-                        } @else {
-                          <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100 animate-pulse">بانتظار التحقق والموافقة</span>
-                        }
-                      </td>
-
-                      <td class="p-4 text-center">
-                        @if (deposit.status === 'pending') {
-                          <div class="flex items-center justify-center gap-1.5">
-                            <button (click)="approveDeposit(deposit.id)"
-                                    class="flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 text-xs shadow-sm cursor-pointer"
-                                    id="approve-deposit-{{ deposit.id }}">
-                              <mat-icon class="text-xs">done</mat-icon>
-                              <span>قبول وشحن المحفظة</span>
-                            </button>
-                            <button (click)="rejectDeposit(deposit.id)"
-                                    class="flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-3 py-1.5 text-xs cursor-pointer"
-                                    id="reject-deposit-{{ deposit.id }}">
-                              <mat-icon class="text-xs">close</mat-icon>
-                              <span>رفض التحويل</span>
-                            </button>
-                          </div>
-                        } @else {
-                          <span class="text-xs text-slate-400 font-medium">- تم اتخاذ القرار -</span>
-                        }
-                      </td>
-
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
-        </div>
-
-        <!-- 2. HOLD BOOKINGS & TICKETS ISSUANCE -->
-        <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden" id="admin-orders-card">
-          <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-            <div>
-              <h3 class="text-base font-black text-slate-900">مراجعة الحجوزات المؤقتة وإصدار التذاكر الإلكترونية (Duffel Issuance)</h3>
-              <p class="text-[10px] text-slate-500 mt-1">تأكيد حجز العميل المؤقت على خوادم دافيل بمجرد قيام الوكيل السياحي برفع إيصال سداد الحجز.</p>
-            </div>
-            <button (click)="fetchAdminOrders()" class="flex items-center gap-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 text-xs cursor-pointer">
-              <mat-icon class="text-sm">sync</mat-icon>
-              <span>تحديث الحجوزات</span>
-            </button>
-          </div>
-
-          @if (ordersLoading() && adminOrdersList().length === 0) {
-            <div class="p-12 text-center text-slate-400">
-              <svg class="animate-spin h-6 w-6 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <p class="text-xs font-bold mt-2">جاري تحميل الحجوزات المحلية...</p>
-            </div>
-          } @else if (adminOrdersList().length === 0) {
-            <div class="p-12 text-center text-slate-400 space-y-2">
-              <mat-icon class="text-3xl text-slate-300">airplane_ticket</mat-icon>
-              <p class="text-xs font-bold">لا توجد حجوزات مسجلة على النظام حالياً.</p>
-            </div>
-          } @else {
-            <div class="overflow-x-auto">
-              <table class="w-full text-right border-collapse text-sm">
-                <thead>
-                  <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
-                    <th class="p-4">المرجع / Ref</th>
-                    <th class="p-4">خط السير والناقل</th>
-                    <th class="p-4 text-left">التكلفة</th>
-                    <th class="p-4">إيصال سداد الحجز المرفوع</th>
-                    <th class="p-4 text-center">مهلة الدفع / Expiry</th>
-                    <th class="p-4 text-center">حالة الحجز</th>
-                    <th class="p-4 text-center">إجراء التأكيد الفوري</th>
-                  </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                  @for (order of adminOrdersList(); track order.id) {
-                    <tr class="hover:bg-slate-50/50 transition">
-
-                      <td class="p-4">
-                        <strong class="block text-slate-900 font-sans tracking-wide text-base font-black">{{ order.booking_reference }}</strong>
-                        <span class="text-[9px] text-slate-400 font-mono">{{ order.id }}</span>
-                      </td>
-
-                      <td class="p-4">
-                        <strong class="block text-slate-800">{{ order.route }}</strong>
-                        <span class="text-[10px] text-slate-500">{{ order.owner_name }}</span>
-                      </td>
-
-                      <td class="p-4 text-left font-sans font-black text-slate-900">
-                        {{ order.total_amount | currency: order.total_currency : 'symbol' : '1.2-2' }}
-                      </td>
-
-                      <td class="p-4">
-                        @if (order.receipt_number) {
-                          <div class="space-y-1">
-                            <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 border border-slate-200">TXN: {{ order.receipt_number }}</span>
-                            <span class="block text-[10px] text-slate-400">إيصال دفع صالح</span>
-                          </div>
-                        } @else {
-                          <span class="text-xs text-slate-400">لم يتم رفع إيصال الدفع للوكيل بعد</span>
-                        }
-                      </td>
-
-                      <td class="p-4 text-center">
-                        @if (order.status === 'awaiting_payment' && order.payment_required_by) {
-                          <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-100">
-                            {{ getCountdown(order.payment_required_by) }}
-                          </span>
-                        } @else {
-                          <span class="text-xs text-slate-400">-</span>
-                        }
-                      </td>
-
-                      <td class="p-4 text-center">
-                        @if (order.status === 'confirmed') {
-                          <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">مؤكد ومُصدر ✅</span>
-                        } @else if (order.status === 'cancelled') {
-                          <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">ملغي ❌</span>
-                        } @else {
-                          <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">معلق وبحاجة تأكيد</span>
-                        }
-                      </td>
-
-                      <td class="p-4 text-center">
-                        <div class="flex flex-col sm:flex-row gap-1.5 items-center justify-center">
-                          <button (click)="viewOrderDetails(order.id)"
-                                  class="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold px-3 py-1.5 text-xs transition cursor-pointer"
-                                  title="تفاصيل الحجز وربح المكتب">
-                            <mat-icon class="text-xs">visibility</mat-icon>
-                            <span>التفاصيل</span>
-                          </button>
-
-                          @if (order.status === 'awaiting_payment') {
-                            <button (click)="confirmAdminOrder(order.id)"
-                                    class="flex items-center gap-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold px-3 py-1.5 text-xs shadow-sm cursor-pointer"
-                                    id="confirm-admin-order-{{ order.id }}">
-                              <mat-icon class="text-xs">done_all</mat-icon>
-                              <span>تأكيد وإصدار</span>
-                            </button>
-                          } @else if (order.status === 'confirmed') {
-                            <div class="bg-emerald-50 text-emerald-700 font-bold rounded-xl px-2.5 py-1 text-xs inline-flex items-center gap-1" id="tickets-ready-badge-{{ order.id }}">
-                              <mat-icon class="text-sm">check_circle</mat-icon>
-                              <span>التذاكر مُصدرة</span>
-                            </div>
-                          } @else {
-                            <span class="text-xs text-slate-400 font-medium">-</span>
-                          }
-                        </div>
-                      </td>
-
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          }
-        </div>
-
-      </div>
+      <app-admin-panel></app-admin-panel>
     }
-
-    <!-- ==============================================
-         VIEW D: ORDER DETAIL VIEW (SHARED)
-         ============================================== -->
-    @if (userView() === 'order-details') {
-      <div class="space-y-6 max-w-4xl mx-auto animate-fade-in text-right" id="order-details-view" dir="rtl">
-
-        <div class="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
-          <button (click)="activeTab() === 'admin' ? userView.set('home') : userView.set('bookings')" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-extrabold px-4 py-2.5 text-xs sm:text-sm cursor-pointer transition shadow-sm">
-            <mat-icon class="text-sm">arrow_forward</mat-icon>
-            <span>العودة لجدول الحجوزات</span>
-          </button>
-
-          <span class="text-xs text-slate-400 font-mono">رقم تعريف الطلب: {{ selectedOrderDetails()?.id }}</span>
-        </div>
-
-        @if (orderDetailsLoading()) {
-          <div class="bg-white border border-slate-100 rounded-3xl p-16 text-center text-slate-400 shadow-sm">
-            <svg class="animate-spin h-8 w-8 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p class="text-xs font-bold mt-3 text-slate-600">جاري تحميل كامل تفاصيل الحجز وتفاصيل الأرباح من دافيل...</p>
-          </div>
-        } @else if (orderDetailsError(); as errorMsg) {
-          <div class="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center text-rose-700 space-y-3 shadow-sm">
-            <mat-icon class="text-4xl">error_outline</mat-icon>
-            <h3 class="text-lg font-black">فشل تحميل تفاصيل الحجز</h3>
-            <p class="text-xs font-sans">{{ errorMsg }}</p>
-            <button (click)="activeTab() === 'admin' ? userView.set('home') : userView.set('bookings')" class="rounded-xl bg-slate-900 text-white font-bold px-4 py-2 text-xs">العودة للرئيسية</button>
-          </div>
-        } @else if (selectedOrderDetails(); as order) {
-
-          <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-            <div class="flex items-center gap-4">
-              @if (order.owner_logo) {
-                <img [src]="order.owner_logo" [alt]="order.owner_name" class="h-12 w-12 object-contain rounded-xl bg-slate-50 p-1" referrerpolicy="no-referrer">
-              } @else {
-                <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500">
-                  <mat-icon>flight</mat-icon>
-                </div>
-              }
-              <div>
-                <div class="flex items-center gap-2 flex-wrap">
-                  <h1 class="text-xl sm:text-2xl font-black text-slate-900 font-sans tracking-wide">Ref: {{ order.booking_reference }}</h1>
-
-                  @if (order.status === 'confirmed') {
-                    <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">
-                      <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                      مؤكد ومُصدر ✅
-                    </span>
-                  } @else if (order.status === 'cancelled') {
-                    <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">
-                      ملغي ومحرر المقاعد ❌
-                    </span>
-                  } @else {
-                    <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">
-                      بانتظار سداد التحويل (Hold) ⏳
-                    </span>
-                  }
-                </div>
-                <p class="text-xs text-slate-400 mt-1">تاريخ الإنشاء: {{ order.created_at | date:'medium' }} | الناقل الرسمي: <strong class="text-slate-700 font-bold">{{ order.owner_name }}</strong></p>
-              </div>
-            </div>
-
-            <div class="flex gap-2">
-              <button (click)="viewOrderDetails(order.id)" class="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 text-xs transition cursor-pointer" title="تحديث البيانات">
-                <mat-icon class="text-sm">sync</mat-icon>
-                <span>تحديث الحالة</span>
-              </button>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-            <div class="lg:col-span-2 space-y-6">
-
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4 text-right">
-                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">navigation</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">خط سير الرحلة (Itinerary)</h3>
-                </div>
-
-                @if (order.slices && order.slices.length > 0) {
-                  @for (slice of order.slices; track $index) {
-                    <div class="border border-slate-100 rounded-2xl p-4 sm:p-6 bg-slate-50/50 space-y-4">
-                      <div class="flex justify-between items-center text-xs text-slate-400">
-                        <span>المدة الكلية للقطاع: <strong>{{ formatDuration(slice.duration) }}</strong></span>
-                        <span>قطاع طيران رقم {{ $index + 1 }}</span>
-                      </div>
-
-                      <div class="flex justify-between items-center gap-4">
-                        <div class="text-right">
-                          <strong class="text-xl sm:text-2xl font-black text-slate-900 font-sans block">{{ slice.origin?.iata_code }}</strong>
-                          <span class="text-xs text-slate-500 block truncate max-w-[150px]">{{ slice.origin?.name }}</span>
-                        </div>
-
-                        <div class="flex-1 flex flex-col items-center justify-center relative">
-                          <div class="h-0.5 bg-slate-200 w-full relative">
-                            <mat-icon class="text-base text-slate-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">flight</mat-icon>
-                          </div>
-                          <span class="text-[9px] text-slate-400 mt-2">ناقل مباشر دافيل</span>
-                        </div>
-
-                        <div class="text-left">
-                          <strong class="text-xl sm:text-2xl font-black text-slate-900 font-sans block text-left">{{ slice.destination?.iata_code }}</strong>
-                          <span class="text-xs text-slate-500 block truncate max-w-[150px] text-left">{{ slice.destination?.name }}</span>
-                        </div>
-                      </div>
-
-                      @if (slice.segments && slice.segments.length > 0) {
-                        <div class="border-t border-slate-100 pt-4 space-y-3">
-                          <span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">تفاصيل الرحلة الفرعية:</span>
-                          @for (seg of slice.segments; track $index) {
-                            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs bg-white rounded-xl p-3 border border-slate-100 gap-2">
-                              <div class="space-y-1 text-right">
-                                <span class="block font-bold text-slate-800">مغادرة: {{ formatDate(seg.departing_at) }} - الساعة {{ formatTime(seg.departing_at) }}</span>
-                                <span class="block text-slate-500 text-[10px]">الناقل المسوق: {{ seg.marketing_carrier?.name || order.owner_name }}</span>
-                              </div>
-                              <div class="space-y-1 text-left sm:text-left">
-                                <span class="block font-bold text-slate-800">وصول: {{ formatDate(seg.arriving_at) }} - الساعة {{ formatTime(seg.arriving_at) }}</span>
-                                <span class="block text-slate-500 text-[10px]">الناقل المشغل: {{ seg.operating_carrier?.name || order.owner_name }}</span>
-                              </div>
-                            </div>
-                          }
-                        </div>
-                      }
-                    </div>
-                  }
-                } @else {
-                  <div class="border border-slate-100 rounded-2xl p-4 bg-slate-50 flex items-center gap-3 text-slate-600">
-                    <mat-icon class="text-slate-400">airplane_ticket</mat-icon>
-                    <div class="text-right">
-                      <span class="block font-bold text-sm">{{ order.route }}</span>
-                      <span class="text-xs text-slate-400">حجز معجل من Duffel API</span>
-                    </div>
-                  </div>
-                }
-              </div>
-
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
-                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">people</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">بيانات المسافرين (Passenger Details)</h3>
-                </div>
-
-                <div class="space-y-3">
-                  @for (passenger of order.passengers; track passenger.id) {
-                    <div class="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row justify-between gap-4 bg-slate-50/50">
-                      <div class="space-y-1.5 text-right">
-                        <span class="text-[10px] font-bold text-slate-400">الاسم الكامل للمسافر</span>
-                        <strong class="text-sm text-slate-900 block">{{ passenger.title | uppercase }}. {{ passenger.given_name }} {{ passenger.family_name }}</strong>
-                        @if (passenger.born_on) {
-                          <span class="text-[10px] text-slate-400 block font-sans">تاريخ الميلاد: {{ passenger.born_on }}</span>
-                        }
-                      </div>
-
-                      <div class="space-y-1.5 sm:text-left">
-                        <span class="text-[10px] font-bold text-slate-400 block sm:text-left">معلومات الاتصال بالراكب</span>
-                        <span class="text-xs text-slate-700 block font-sans select-all">{{ passenger.email || 'غير متوفر' }}</span>
-                        <span class="text-xs text-slate-500 block font-sans select-all">{{ passenger.phone_number || 'غير متوفر' }}</span>
-                      </div>
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
-                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">local_activity</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">أرقام التذاكر الإلكترونية والوثائق</h3>
-                </div>
-
-                @if (order.status === 'confirmed') {
-                  <div class="space-y-3">
-                    <div class="bg-emerald-50 border border-emerald-150 rounded-2xl p-4 flex items-start gap-3 text-emerald-800 text-right">
-                      <mat-icon class="text-emerald-600 mt-0.5 shrink-0">check_circle</mat-icon>
-                      <div>
-                        <span class="block font-black text-xs sm:text-sm">تم إصدار وثائق السفر بنجاح من Duffel V2 API!</span>
-                        <span class="text-[10px] text-emerald-600 block mt-1">تعتبر هذه الوثيقة تذكرة سفر إلكترونية رسمية صالحة للصعود للطائرة مباشرة.</span>
-                      </div>
-                    </div>
-
-                    @if (order.tickets && order.tickets.length > 0) {
-                      @for (t of order.tickets; track t.ticket_number) {
-                        <div class="flex justify-between items-center border border-slate-100 rounded-xl p-4 bg-slate-50">
-                          <div class="text-right">
-                            <span class="text-[10px] text-slate-400">المسافر المستفيد</span>
-                            <strong class="text-slate-800 block text-xs">{{ t.passenger_name }}</strong>
-                          </div>
-                          <div class="text-left">
-                            <span class="text-[10px] text-slate-400 block text-left">رقم التذكرة الإلكترونية / E-Ticket</span>
-                            <strong class="text-slate-900 block text-sm font-mono tracking-wider select-all">{{ t.ticket_number }}</strong>
-                          </div>
-                        </div>
-                      }
-                    } @else if (order.documents && order.documents.length > 0) {
-                      @for (doc of order.documents; track doc.unique_identifier) {
-                        <div class="flex justify-between items-center border border-slate-100 rounded-xl p-4 bg-slate-50">
-                          <div class="text-right">
-                            <span class="text-[10px] text-slate-400">نوع المستند وثيقة السفر</span>
-                            <strong class="text-slate-800 block text-xs">Official Flight Coupon</strong>
-                          </div>
-                          <div class="text-left">
-                            <span class="text-[10px] text-slate-400 block text-left">الرمز التعريفي الفريد / Document Code</span>
-                            <strong class="text-slate-900 block text-sm font-mono tracking-wider select-all">{{ doc.unique_identifier }}</strong>
-                          </div>
-                        </div>
-                      }
-                    } @else {
-                      <div class="flex justify-between items-center border border-slate-100 rounded-xl p-4 bg-slate-50">
-                        <div class="text-right">
-                          <span class="text-[10px] text-slate-400">الراكب الرئيسي</span>
-                          <strong class="text-slate-800 block text-xs">جميع الركاب</strong>
-                        </div>
-                        <div class="text-left">
-                          <span class="text-[10px] text-slate-400 block text-left">رقم الحجز والتذكرة الموحد</span>
-                          <strong class="text-slate-900 block text-sm font-mono tracking-wider select-all">ETKT-DFL{{ order.booking_reference }}</strong>
-                        </div>
-                      </div>
-                    }
-                  </div>
-                } @else {
-                  <div class="border border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-400 bg-slate-50/50 space-y-2">
-                    <mat-icon class="text-3xl text-slate-300">hourglass_empty</mat-icon>
-                    <h4 class="text-sm font-bold text-slate-600">التذاكر الإلكترونية قيد الانتظار</h4>
-                    <p class="text-xs max-w-sm mx-auto text-slate-400 leading-relaxed">سيتم توليد وإصدار أرقام التذاكر الإلكترونية (E-Tickets) فوراً وبشكل تلقائي بمجرد قيام الإدارة بمراجعة الحوالة وتأكيد الدفع.</p>
-                  </div>
-                }
-              </div>
-
-            </div>
-
-            <div class="space-y-6">
-
-              <div class="bg-white border-2 border-slate-900 rounded-3xl shadow-md p-6 sm:p-8 space-y-4 relative overflow-hidden" id="markup-pricing-breakdown">
-                <div class="absolute -top-12 -left-12 h-24 w-24 rounded-full bg-amber-500/10 blur-xl"></div>
-
-                <div class="flex items-center gap-2 border-b border-slate-100 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">payments</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">تفاصيل التسعير والربح</h3>
-                </div>
-
-                <div class="space-y-3 text-xs text-slate-600">
-                  <div class="flex justify-between">
-                    <span>السعر الأساسي للرحلة (Base):</span>
-                    <span class="font-sans font-bold">${{ order.base_amount }} {{ order.total_currency }}</span>
-                  </div>
-
-                  <div class="flex justify-between">
-                    <span>الضرائب والرسوم (Taxes):</span>
-                    <span class="font-sans font-bold">${{ order.tax_amount }} {{ order.total_currency }}</span>
-                  </div>
-
-                  <div class="flex justify-between border-t border-slate-100 pt-2 text-slate-800 font-extrabold">
-                    <span>صافي تكلفة Duffel المباشرة:</span>
-                    <span class="font-sans">${{ order.total_amount }} {{ order.total_currency }}</span>
-                  </div>
-
-                  <div class="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 p-2.5 rounded-xl font-extrabold">
-                    <span>هامش ربح المكتب ({{ order.markup_percentage_at_booking }}%):</span>
-                    <span class="font-sans">+${{ order.office_markup_amount }} {{ order.total_currency }}</span>
-                  </div>
-
-                  <div class="border-t border-slate-200 pt-3 flex justify-between items-end">
-                    <span class="text-xs font-black text-slate-900">إجمالي المطلوب من العميل:</span>
-                    <span class="text-xl font-black text-emerald-600 font-sans tracking-tight">${{ order.office_total_amount }} {{ order.total_currency }}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
-                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">info_outline</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">شروط وقواعد التذكرة</h3>
-                </div>
-
-                <div class="space-y-3 text-xs text-right">
-                  <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
-                    <strong class="text-slate-800 font-bold block">سياسة الإلغاء والاسترجاع:</strong>
-                    <span class="text-slate-500 block">
-                      {{ order.conditions?.refund_before_departure?.allowed ? 'قابلة للاسترجاع برسوم إلغاء قبل الإقلاع.' : 'غير قابلة للاسترجاع (Non-refundable) تذكرة سياحية مقيدة.' }}
-                    </span>
-                  </div>
-
-                  <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
-                    <strong class="text-slate-800 font-bold block">سياسة تغيير موعد السفر:</strong>
-                    <span class="text-slate-500 block">
-                      {{ order.conditions?.change_before_departure?.allowed ? 'قابلة للتغيير مع دفع رسوم التغيير وفروقات السعر.' : 'تعديل التذاكر خاضع لشروط الناقل الرسمي للرحلة مباشرة.' }}
-                    </span>
-                  </div>
-
-                  @if (order.status === 'awaiting_payment' && order.payment_required_by) {
-                    <div class="bg-rose-50 border border-rose-150 rounded-xl p-3 text-rose-700 space-y-1 text-center font-bold">
-                      <span class="block text-[10px] text-rose-500 uppercase">الوقت المتبقي لتأكيد الحجز قبل الإلغاء التلقائي:</span>
-                      <span class="font-sans block text-sm">{{ getCountdown(order.payment_required_by) }}</span>
-                    </div>
-                  }
-                </div>
-              </div>
-
-              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
-                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
-                  <mat-icon class="text-slate-700">settings_applications</mat-icon>
-                  <h3 class="text-base font-black text-slate-900">العمليات المتاحة</h3>
-                </div>
-
-                <div class="flex flex-col gap-2.5">
-                  @if (order.status === 'awaiting_payment') {
-
-                    @if (activeTab() === 'admin') {
-                      <button (click)="confirmAdminOrder(order.id); viewOrderDetails(order.id)" class="w-full rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95">
-                        <mat-icon class="text-sm">done_all</mat-icon>
-                        <span>تأكيد الحجز في دافيل وإصدار التذاكر</span>
-                      </button>
-                    } @else if (!order.receipt_number) {
-                      <button (click)="openReceiptModal(order)" class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95">
-                        <mat-icon class="text-sm">upload_file</mat-icon>
-                        <span>رفع إيصال التحويل وسداد الحجز</span>
-                      </button>
-                    } @else {
-                      <div class="bg-slate-50 text-slate-600 rounded-2xl p-3 text-center text-xs font-bold border border-slate-100">
-                        ⏳ إيصال الدفع تحت المراجعة من قبل الإدارة
-                      </div>
-                    }
-
-                    <button (click)="cancelOrder(order); activeTab() === 'admin' ? userView.set('home') : userView.set('bookings')" class="w-full rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer transition">
-                      <mat-icon class="text-sm">delete_outline</mat-icon>
-                      <span>إلغاء حجز المقاعد المؤقت</span>
-                    </button>
-                  } @else if (order.status === 'confirmed') {
-                    <div class="bg-emerald-50 text-emerald-800 border border-emerald-150 rounded-2xl p-4 text-center text-xs font-black">
-                      ✨ تم إتمام المعاملة وتأكيد المقاعد وإصدار المستندات الرسمية بنجاح!
-                    </div>
-                  } @else {
-                    <div class="bg-slate-100 text-slate-500 rounded-2xl p-4 text-center text-xs font-bold">
-                      🚫 هذا الحجز ملغي في نظام دافيل وتم تحرير جميع المقاعد.
-                    </div>
-                  }
-
-                  <div class="border-t border-slate-100 pt-3.5 mt-2.5 space-y-2">
-                    <span class="block text-[10px] font-black text-slate-400 text-right uppercase tracking-wider">مشاركة تفاصيل الرحلة:</span>
-
-                    <button (click)="downloadItineraryPDF(order.id)"
-                            [disabled]="pdfDownloading()"
-                            class="w-full rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95 disabled:opacity-50">
-                      <mat-icon class="text-sm">picture_as_pdf</mat-icon>
-                      <span>{{ pdfDownloading() ? 'جاري تحميل برنامج الرحلة (PDF)...' : 'تحميل وثيقة البرنامج بالتسعير والباركود (PDF)' }}</span>
-                    </button>
-
-                    <button (click)="shareViaWhatsApp(order)"
-                            class="w-full rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95">
-                      <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946C.06 5.348 5.397.01 12.008.01c3.202.001 6.212 1.246 8.477 3.513 2.266 2.268 3.507 5.28 3.505 8.484-.004 6.657-5.34 11.997-11.953 11.997-2.005-.001-3.973-.502-5.724-1.457L0 24zm6.59-4.846c1.6.95 3.188 1.449 4.825 1.451 5.436 0 9.86-4.42 9.863-9.864.001-2.63-1.019-5.101-2.871-6.957C16.598 1.93 14.12 1.9 12.012 1.9c-5.439 0-9.865 4.422-9.867 9.867-.001 1.765.467 3.491 1.355 5.017l-.989 3.618 3.71-.973zm11.517-5.64c-.312-.156-1.854-.914-2.13-.1015-.044-.09-.076-.135-.112-.19-.244-.347-.643-.523-1.124-.764l-.37-.184c-.45-.224-.897-.47-1.314-.766-.46-.328-.863-.715-1.196-1.15-.658-.858-1.096-1.782-1.306-2.775-.054-.257-.044-.457.042-.647.085-.187.247-.417.373-.564.125-.147.167-.21.25-.378.084-.167.042-.313-.021-.47-.062-.156-.563-1.354-.77-1.854-.202-.487-.41-.42-.563-.427-.145-.007-.312-.007-.479-.007-.167 0-.438.062-.667.313-.23.25-.875.855-.875 2.083 0 1.23.896 2.417.99 2.54 1.05 1.38 2.25 2.53 3.53 3.46 1.4.103 2.51.185 3.39.213.88.028 1.68.028 2.31.028.63 0 1.853-.102 2.13-.914.28-.813.28-1.51.195-1.65-.084-.135-.312-.22-.624-.376z"/>
-                      </svg>
-                      <span>مشاركة برنامج الرحلة عبر WhatsApp</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-            </div>
-
-          </div>
-
-        }
-
-      </div>
-    }
-
 
   </main>
 
-  <!-- ==============================================
-       FOOTER (يُخفى على الموبايل — يحل محله الـ bottom navbar)
-       ============================================== -->
-  <footer class="hidden lg:block bg-slate-900 text-slate-300 mt-auto" id="main-footer">
-    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10 sm:py-14">
+  <!-- FOOTER -->
+  <footer class="bg-slate-900 text-slate-400 pt-12 pb-16 sm:pb-20 mt-16 border-t border-slate-850" id="main-footer">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 text-right" dir="rtl">
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 text-right" dir="rtl">
-
-        <div class="space-y-3 sm:col-span-2 lg:col-span-1">
-          <div class="flex items-center gap-2.5 justify-start">
-            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400 shrink-0">
-              <mat-icon class="text-xl">flight_takeoff</mat-icon>
+        <div class="space-y-4">
+          <div class="flex items-center gap-2.5">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/15 text-amber-400 border border-amber-400/20">
+              <mat-icon>flight_takeoff</mat-icon>
             </div>
-            <span class="text-xl font-black text-white"><span class="text-amber-400">برق</span></span>
+            <strong class="text-lg font-black text-white font-sans">برق بزنس</strong>
           </div>
-          <p class="text-xs text-slate-400 leading-relaxed max-w-xs">
-            منصة B2B متكاملة لوكلاء ومكاتب السفر والسياحة، تتيح البحث والمقارنة والحجز الفوري لرحلات الطيران عبر الربط المباشر مع Duffel API.
-          </p>
-          <div class="flex items-center gap-2 pt-1">
-            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-amber-500/20 hover:text-amber-400 transition cursor-pointer" title="تويتر / X">
-              <svg class="h-4 w-4 fill-current" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-            </a>
-            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-amber-500/20 hover:text-amber-400 transition cursor-pointer" title="انستغرام">
-              <mat-icon class="text-lg">photo_camera</mat-icon>
-            </a>
-            <a href="#" class="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 hover:bg-[#25D366]/20 hover:text-[#25D366] transition cursor-pointer" title="واتساب الدعم الفني">
-              <mat-icon class="text-lg">chat</mat-icon>
-            </a>
-          </div>
+          <p class="text-xs text-slate-400 leading-relaxed">بوابتك السياحية الشاملة لربط مكاتب السفر بأكبر شبكات الطيران العالمية عبر Duffel APIs. ريادة، سرعة، وأمان مالي متكامل.</p>
         </div>
 
         <div class="space-y-3">
@@ -2155,11 +916,11 @@
           <ul class="space-y-2.5 text-xs">
             <li class="flex items-center gap-2 justify-start">
               <mat-icon class="text-sm text-amber-400 shrink-0">mail</mat-icon>
-              <span class="break-all">support&#64;barq-business.com</span>
+              <span class="break-all font-sans">support&#64;barq-business.com</span>
             </li>
             <li class="flex items-center gap-2 justify-start">
               <mat-icon class="text-sm text-amber-400 shrink-0">call</mat-icon>
-              <span dir="ltr">+966 11 234 5678</span>
+              <span dir="ltr" class="font-sans">+966 11 234 5678</span>
             </li>
             <li class="flex items-center gap-2 justify-start">
               <mat-icon class="text-sm text-amber-400 shrink-0">schedule</mat-icon>
@@ -2171,8 +932,8 @@
       </div>
 
       <div class="mt-8 sm:mt-10 pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-right" dir="rtl">
-        <span class="text-[11px] text-slate-500">© {{ currentYear }} برق بزنس. جميع الحقوق محفوظة.</span>
-        <span class="text-[11px] text-slate-500 flex items-center gap-1.5">
+        <span class="text-[11px] text-slate-500 font-sans">© {{ currentYear }} برق بزنس. جميع الحقوق محفوظة.</span>
+        <span class="text-[11px] text-slate-500 flex items-center gap-1.5 justify-end">
           <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
           يعمل حالياً في وضع Duffel Sandbox للتجربة فقط
         </span>
@@ -2180,10 +941,7 @@
     </div>
   </footer>
 
-  <!-- ==============================================
-       MOBILE BOTTOM NAVBAR — احترافي، ثابت أسفل الشاشة (ملاحظة صريحة من الطلب)
-       يظهر فقط على الموبايل/التابلت الصغير (lg:hidden) وفقط عند تسجيل الدخول
-       ============================================== -->
+  <!-- MOBILE BOTTOM NAVBAR -->
   @if (currentUser()) {
     <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-100 shadow-[0_-4px_20px_rgba(0,0,0,0.06)]"
          style="padding-bottom: env(safe-area-inset-bottom);"
@@ -2219,7 +977,7 @@
           <span class="text-[10px] font-bold">الحجوزات</span>
         </button>
 
-        <!-- المحفظة — بارزة قليلاً في المنتصف -->
+        <!-- المحفظة -->
         <button (click)="userView.set('wallet'); activeTab.set('agency')"
                 class="relative flex flex-col items-center justify-center cursor-pointer"
                 id="mnav-wallet">
@@ -2251,7 +1009,7 @@
           <span class="text-[10px] font-bold">الإشعارات</span>
         </button>
 
-        <!-- القائمة (تفتح Side Menu: الملف الشخصي + الإدارة + تسجيل الخروج) -->
+        <!-- القائمة -->
         <button (click)="sideMenuOpen.set(true)"
                 class="relative flex flex-col items-center justify-center gap-1 cursor-pointer transition text-slate-400"
                 id="mnav-menu">
@@ -2263,206 +1021,7 @@
     </nav>
   }
 
-  <!-- ==============================================
-       MODAL 1: PASSENGER BOOKING DIALOG & METHOD SELECTOR
-       ============================================== -->
-  @if (showBookingModal(); as modalOpen) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 animate-fade-in" id="booking-modal">
-
-      <div class="bg-white rounded-3xl border border-slate-100 max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-
-        <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <div class="flex items-center gap-2">
-            <mat-icon class="text-slate-700">contact_page</mat-icon>
-            <h3 class="text-lg font-extrabold text-slate-900">حجز وإصدار التذاكر للراكب الرئيسي</h3>
-          </div>
-          <button (click)="closeBookingModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer" id="close-booking-modal-btn">
-            <mat-icon>close</mat-icon>
-          </button>
-        </div>
-
-        <div class="p-6 overflow-y-auto space-y-6 flex-1">
-
-          @if (bookingSuccess(); as success) {
-            <div class="text-center space-y-4 py-4" id="booking-success-container">
-              <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 shadow-sm animate-bounce">
-                <mat-icon class="text-4xl">done_all</mat-icon>
-              </div>
-              <h4 class="text-xl font-extrabold text-slate-900">تم حجز وتأكيد الرحلة بنجاح!</h4>
-              <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                تم الاحتفاظ بالمقاعد وسعر الصرف مع شركة الطيران. سيتم المتابعة والتأكيد مع الإدارة فور مراجعة التحويل.
-              </p>
-
-              <div class="bg-slate-50 rounded-2xl p-4 text-right space-y-2 border border-slate-100 font-mono text-xs">
-                <div class="flex justify-between"><span class="text-slate-500">مرجع الحجز (PNR):</span> <strong class="text-slate-950 text-sm font-black">{{ success.booking_reference }}</strong></div>
-                <div class="flex justify-between"><span class="text-slate-500">موقع العرض في Duffel:</span> <span class="text-slate-600 font-sans select-all">{{ success.id }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">المبلغ الإجمالي المحمي:</span> <strong class="text-slate-950">{{ success.total_amount }} {{ success.total_currency }}</strong></div>
-                <div class="flex justify-between"><span class="text-slate-500">الحالة الحالية:</span> <strong class="text-slate-950">{{ success.payment_status }}</strong></div>
-              </div>
-
-              <div class="flex justify-center pt-2">
-                <button (click)="closeBookingModal()" class="rounded-xl bg-amber-500 text-slate-900 font-black px-6 py-2.5 text-xs shadow-md cursor-pointer" id="success-done-btn">
-                  إغلاق النافذة والمتابعة
-                </button>
-              </div>
-            </div>
-          } @else {
-
-            @if (selectedOffer(); as offer) {
-              <div class="rounded-2xl bg-slate-50 border border-slate-100 p-4 space-y-1.5" id="modal-flight-overview">
-                <div class="flex justify-between text-xs font-bold text-slate-500">
-                  <span>الرحلة المحددة:</span>
-                  <span class="text-slate-800">{{ offer.owner?.name }}</span>
-                </div>
-                <div class="flex justify-between items-center">
-                  <span class="text-sm font-black text-slate-800">
-                    {{ searchForm.value.origin }} ➔ {{ searchForm.value.destination }}
-                  </span>
-                  <span class="text-base font-black text-slate-900 font-sans">
-                    {{ offer.total_amount | currency: offer.total_currency : 'symbol' : '1.2-2' }}
-                  </span>
-                </div>
-              </div>
-            }
-
-            <form [formGroup]="passengerForm" class="space-y-4" id="hold-booking-form">
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">اللقب</span>
-                  <select formControlName="title" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                    <option value="mr">السيد / Mr</option>
-                    <option value="mrs">السيدة / Mrs</option>
-                    <option value="ms">الآنسة / Ms</option>
-                  </select>
-                </div>
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">الجنس</span>
-                  <select formControlName="gender" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                    <option value="m">ذكر</option>
-                    <option value="f">أنثى</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">الاسم الأول (بالإنجليزي)</span>
-                  <input type="text" formControlName="givenName" placeholder="مثال: AHMED" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold uppercase focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                </div>
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">اسم العائلة (بالإنجليزي)</span>
-                  <input type="text" formControlName="familyName" placeholder="مثال: ALOMARI" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold uppercase focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                </div>
-              </div>
-
-              <div class="space-y-1.5">
-                <span class="block text-xs font-bold text-slate-500">تاريخ الميلاد</span>
-                <input type="date" formControlName="bornOn" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-              </div>
-
-              <div class="grid grid-cols-2 gap-4">
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">البريد الإلكتروني للراكب</span>
-                  <input type="email" formControlName="email" placeholder="passenger@example.com" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                </div>
-                <div class="space-y-1.5">
-                  <span class="block text-xs font-bold text-slate-500">رقم الهاتف</span>
-                  <input type="tel" formControlName="phoneNumber" placeholder="+966500000000" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-                </div>
-              </div>
-
-              @if (bookingError()) {
-                <div class="rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-xs font-semibold text-rose-700 leading-relaxed">
-                  ⚠️ {{ bookingError() }}
-                </div>
-              }
-
-              <div class="border-t border-slate-100 pt-5 space-y-3">
-                <span class="text-xs font-black text-slate-900 block">اختر طريقة حجز الرحلة في نظام دافيل:</span>
-
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-
-                  <button type="button" (click)="confirmHoldBooking()" [disabled]="bookingLoading()"
-                          class="flex flex-col items-center text-center p-4 rounded-2xl border border-slate-200 hover:border-amber-500 bg-slate-50/50 hover:bg-amber-50/30 transition duration-200 cursor-pointer text-slate-700">
-                    <mat-icon class="text-amber-500 mb-1">hourglass_empty</mat-icon>
-                    <span class="text-xs font-black">حجز مؤقت (Hold)</span>
-                    <span class="text-[9px] text-slate-400 mt-1">تثبيت المقعد ورفع إيصال التحويل للمطابقة لاحقاً</span>
-                  </button>
-
-                  <button type="button" (click)="confirmInstantBooking()" [disabled]="bookingLoading()"
-                          class="flex flex-col items-center text-center p-4 rounded-2xl border border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/30 transition duration-200 cursor-pointer text-slate-700">
-                    <mat-icon class="text-emerald-500 mb-1">bolt</mat-icon>
-                    <span class="text-xs font-black">خصم فوري من المحفظة</span>
-                    <span class="text-[9px] text-slate-400 mt-1">شراء مباشر وإصدار تذاكر دافيل فوراً بالرصيد</span>
-                  </button>
-
-                </div>
-
-                @if (bookingLoading()) {
-                  <div class="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500 pt-3">
-                    <svg class="animate-spin h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24">
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                      <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    <span>جاري تأكيد حجز الرحلة وإبلاغ دافيل...</span>
-                  </div>
-                }
-              </div>
-
-            </form>
-          }
-
-        </div>
-
-      </div>
-    </div>
-  }
-
-  <!-- ==============================================
-       MODAL 2: UPLOAD HOLD BOOKING RECEIPT DIALOG
-       ============================================== -->
-  @if (showReceiptModal(); as receiptOpen) {
-    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition animate-fade-in" id="receipt-upload-modal">
-      <div class="bg-white rounded-3xl border border-slate-100 max-w-md w-full overflow-hidden shadow-2xl p-6 space-y-6">
-
-        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div class="flex items-center gap-2">
-            <mat-icon class="text-amber-500">upload_file</mat-icon>
-            <h3 class="text-base font-black text-slate-900">إثبات سداد الحجز المؤقت</h3>
-          </div>
-          <button (click)="showReceiptModal.set(false); receiptSelectedOrder.set(null)" class="text-slate-400 hover:text-slate-600 cursor-pointer">
-            <mat-icon>close</mat-icon>
-          </button>
-        </div>
-
-        @if (receiptSelectedOrder(); as order) {
-          <div class="bg-slate-50 rounded-2xl p-4 text-xs space-y-2 border border-slate-100 font-mono">
-            <div class="flex justify-between"><span class="text-slate-400 font-sans">مرجع الحجز:</span> <strong class="text-slate-950 tracking-wide text-sm">{{ order.booking_reference }}</strong></div>
-            <div class="flex justify-between"><span class="text-slate-400 font-sans">خط السير:</span> <strong class="text-slate-950 font-sans">{{ order.route }}</strong></div>
-            <div class="flex justify-between"><span class="text-slate-400 font-sans">المبلغ المطلوب سداده:</span> <strong class="text-emerald-600 font-sans font-black">{{ order.total_amount }} {{ order.total_currency }}</strong></div>
-          </div>
-        }
-
-        <form [formGroup]="holdReceiptForm" (ngSubmit)="submitHoldBookingReceipt()" class="space-y-4" id="hold-receipt-form-el">
-          <div class="space-y-1.5">
-            <span class="block text-xs font-bold text-slate-500">رقم إيصال التحويل البنكي</span>
-            <input type="text" formControlName="receiptNumber" placeholder="مثال: BankTRX9871" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
-          </div>
-
-          <div class="border-2 border-dashed border-slate-200 rounded-2xl p-5 text-center space-y-1.5 hover:bg-slate-50/50 cursor-pointer transition">
-            <mat-icon class="text-slate-400">cloud_upload</mat-icon>
-            <p class="text-xs font-bold text-slate-700">اسحب أو حدد صورة إيصال الدفع للرحلة</p>
-            <span class="text-[10px] text-slate-400 block">PNG, JPG (الحد الأقصى 5 ميجابايت)</span>
-          </div>
-
-          <button type="submit" class="w-full rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-3 text-xs shadow-md transition active:scale-95 cursor-pointer">
-            إرسال إثبات السداد وتأكيد الحجز
-          </button>
-        </form>
-
-      </div>
-    </div>
-  }
+  <!-- DYNAMIC BOOKING DIALOG COMPONENT -->
+  <app-booking-modal></app-booking-modal>
 
 </div>

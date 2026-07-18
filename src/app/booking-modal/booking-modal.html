@@ -1,0 +1,299 @@
+<!-- ==============================================
+     MODAL 1: PASSENGER BOOKING DIALOG (INTEGRATED SINGLE STEP)
+     ============================================== -->
+@if (app.showBookingModal(); as modalOpen) {
+  <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300 animate-fade-in" id="booking-modal">
+
+    <div class="bg-white rounded-3xl border border-slate-100 max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+
+      <div class="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <mat-icon class="text-slate-700">contact_page</mat-icon>
+          <h3 class="text-lg font-extrabold text-slate-900">حجز وتثبيت المقعد الفوري</h3>
+        </div>
+        <button (click)="app.closeBookingModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer" id="close-booking-modal-btn">
+          <mat-icon>close</mat-icon>
+        </button>
+      </div>
+
+      <div class="p-6 overflow-y-auto space-y-6 flex-1 text-right" dir="rtl">
+
+        @if (app.bookingSuccess(); as success) {
+          <div class="text-center space-y-4 py-4" id="booking-success-container">
+            <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 shadow-sm animate-bounce">
+              <mat-icon class="text-4xl">done_all</mat-icon>
+            </div>
+            <h4 class="text-xl font-extrabold text-slate-900">تم حجز وتثبيت الرحلة بنجاح!</h4>
+            <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
+              @if (app.paymentMethod() === 'wallet') {
+                تم خصم قيمة الحجز من محفظتك وتثبيت المقاعد مع شركة الطيران وإصدار التذاكر الإلكترونية فوراً.
+              } @else {
+                تم حجز وتثبيت المقاعد مع شركة الطيران بنجاح. سيتم مراجعة إيصال التحويل من قبل الإدارة لتأكيد وإصدار التذاكر الإلكترونية خلال دقائق.
+              }
+            </p>
+
+            <div class="bg-slate-50 rounded-2xl p-4 text-right space-y-2 border border-slate-100 font-mono text-xs">
+              <div class="flex justify-between"><span class="text-slate-500">مرجع الحجز (PNR):</span> <strong class="text-slate-950 text-sm font-black">{{ success.booking_reference }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">موقع العرض في Duffel:</span> <span class="text-slate-600 font-sans select-all">{{ success.id }}</span></div>
+              <div class="flex justify-between"><span class="text-slate-500">المبلغ الإجمالي المحمي:</span> <strong class="text-slate-950">{{ success.total_amount }} {{ success.total_currency }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">الحالة الحالية:</span> <strong class="text-slate-950">{{ app.paymentMethod() === 'wallet' ? 'مؤكد ومصدر' : 'قيد الانتظار والمراجعة' }}</strong></div>
+            </div>
+
+            <div class="flex justify-center pt-2">
+              <button (click)="app.closeBookingModal()" class="rounded-xl bg-amber-500 text-slate-900 font-black px-6 py-2.5 text-xs shadow-md cursor-pointer" id="success-done-btn">
+                إغلاق النافذة والمتابعة
+              </button>
+            </div>
+          </div>
+        } @else {
+
+          @if (app.selectedOffer(); as offer) {
+            <!-- Detailed Pricing Breakdown with Platform Commission (Tax) -->
+            <div class="rounded-2xl bg-slate-50 border border-slate-200 p-4 space-y-2 text-right" id="modal-flight-overview">
+              <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                <span class="text-xs font-black text-slate-900">بيانات الرحلة المحددة:</span>
+                <span class="text-xs font-bold text-slate-600">{{ offer.owner?.name }}</span>
+              </div>
+
+              <div class="space-y-1.5 text-xs text-slate-600">
+                <div class="flex justify-between">
+                  <span>خط السير:</span>
+                  <strong class="text-slate-800">{{ app.searchForm.get('origin')?.value }} ➔ {{ app.searchForm.get('destination')?.value }}</strong>
+                </div>
+                <div class="flex justify-between border-t border-slate-200 pt-2 text-sm font-black text-slate-900">
+                  <span>السعر الإجمالي المطلوب:</span>
+                  <strong class="font-sans text-teal-600 text-base font-black">${{ app.selectedOfferTotalAmount() }} {{ offer.total_currency }}</strong>
+                </div>
+              </div>
+            </div>
+
+            <!-- ============ اختيار طريقة الدفع ============ -->
+            <div class="space-y-2" id="payment-method-switch">
+              <span class="block text-xs font-black text-slate-900">طريقة الدفع:</span>
+              <div class="grid grid-cols-2 gap-3">
+
+                <button type="button" (click)="app.selectPaymentMethod('wallet')"
+                        [disabled]="!app.walletSufficient()"
+                        class="rounded-2xl border p-3 text-right transition"
+                        [class.border-amber-500]="app.paymentMethod() === 'wallet'"
+                        [class.bg-amber-50]="app.paymentMethod() === 'wallet'"
+                        [class.border-slate-200]="app.paymentMethod() !== 'wallet'"
+                        [class.opacity-40]="!app.walletSufficient()"
+                        [class.cursor-not-allowed]="!app.walletSufficient()"
+                        [class.cursor-pointer]="app.walletSufficient()">
+                  <div class="flex items-center justify-between">
+                    <mat-icon class="text-slate-700 text-lg">account_balance_wallet</mat-icon>
+                    @if (app.paymentMethod() === 'wallet') {
+                      <mat-icon class="text-amber-600 text-base">check_circle</mat-icon>
+                    }
+                  </div>
+                  <strong class="block text-xs font-black text-slate-900 mt-1">الدفع من المحفظة</strong>
+                  <span class="block text-[10px] text-slate-500 mt-0.5">
+                    @if (app.walletSufficient()) {
+                      الرصيد يكفي — خصم وإصدار فوري
+                    } @else {
+                      الرصيد غير كافٍ
+                    }
+                  </span>
+                </button>
+
+                <button type="button" (click)="app.selectPaymentMethod('bank')"
+                        class="rounded-2xl border p-3 text-right cursor-pointer transition"
+                        [class.border-amber-500]="app.paymentMethod() === 'bank'"
+                        [class.bg-amber-50]="app.paymentMethod() === 'bank'"
+                        [class.border-slate-200]="app.paymentMethod() !== 'bank'">
+                  <div class="flex items-center justify-between">
+                    <mat-icon class="text-slate-700 text-lg">account_balance</mat-icon>
+                    @if (app.paymentMethod() === 'bank') {
+                      <mat-icon class="text-amber-600 text-base">check_circle</mat-icon>
+                    }
+                  </div>
+                  <strong class="block text-xs font-black text-slate-900 mt-1">تحويل بنكي</strong>
+                  <span class="block text-[10px] text-slate-500 mt-0.5">إرفاق إيصال ومراجعة الإدارة</span>
+                </button>
+
+              </div>
+            </div>
+
+            <!-- ============ بطاقة الدفع من المحفظة ============ -->
+            @if (app.paymentMethod() === 'wallet') {
+              <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-right space-y-1.5" id="wallet-pay-card">
+                <div class="flex items-center gap-2 text-emerald-700">
+                  <mat-icon class="text-emerald-600">account_balance_wallet</mat-icon>
+                  <strong class="text-sm font-black">سيتم الخصم من رصيد محفظتك مباشرة</strong>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-500">الرصيد الحالي:</span>
+                  <strong class="font-sans text-slate-900">${{ app.currentUser()?.wallet_balance?.toFixed(2) }}</strong>
+                </div>
+                <div class="flex justify-between text-xs">
+                  <span class="text-slate-500">قيمة الحجز:</span>
+                  <strong class="font-sans text-slate-900">${{ app.selectedOfferTotalAmount() }}</strong>
+                </div>
+                <div class="flex justify-between text-xs border-t border-emerald-100 pt-1.5">
+                  <span class="text-slate-500">الرصيد بعد الحجز:</span>
+                  <strong class="font-sans text-emerald-700">${{ app.walletBalanceAfterBooking() }}</strong>
+                </div>
+              </div>
+            }
+
+            <!-- Platform Bank Account Details (فقط لو تحويل بنكي) -->
+            @if (app.paymentMethod() === 'bank') {
+              <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-right space-y-2.5" id="bank-details-card">
+                <div class="flex items-center gap-2 text-amber-800">
+                  <mat-icon class="text-amber-600">account_balance</mat-icon>
+                  <strong class="text-sm font-black">تفاصيل الحساب البنكي للمنصة (برق)</strong>
+                </div>
+                <p class="text-xs text-slate-600 leading-relaxed">
+                  يرجى تحويل قيمة الرحلة الكلية
+                  <strong class="text-teal-600 font-sans text-sm">${{ app.selectedOfferTotalAmount() }} USD</strong>
+                  إلى الحساب أدناه، ثم كتابة رقم التحويل وإرفاق الإيصال لإتمام الحجز وتثبيته فوراً:
+                </p>
+                <div class="bg-white rounded-xl p-3 border border-slate-100 text-xs space-y-2 font-mono">
+                  <div class="flex justify-between">
+                    <span class="text-slate-500 font-sans">اسم البنك:</span>
+                    <strong class="text-slate-900">مصرف الراجحي / Al Rajhi Bank</strong>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-500 font-sans">اسم الحساب:</span>
+                    <strong class="text-slate-900">شركة برق لخدمات سفر الأعمال</strong>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-500 font-sans">رقم الحساب:</span>
+                    <span class="text-slate-900 font-bold select-all">1234567890123456</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-slate-500 font-sans">الآيبان IBAN:</span>
+                    <span class="text-slate-900 font-bold select-all">SA9380000012345678901234</span>
+                  </div>
+                </div>
+              </div>
+            }
+          }
+
+          <form [formGroup]="app.passengerForm" class="space-y-4" id="hold-booking-form">
+
+            <div class="border-t border-slate-150 pt-3">
+              <span class="text-xs font-black text-slate-900 block mb-3">بيانات المسافر الرئيسي (بالأحرف الإنجليزية):</span>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">اللقب</span>
+                  <select formControlName="title" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                    <option value="mr">السيد / Mr</option>
+                    <option value="mrs">السيدة / Mrs</option>
+                    <option value="ms">الآنسة / Ms</option>
+                  </select>
+                </div>
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">الجنس</span>
+                  <select formControlName="gender" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                    <option value="m">ذكر</option>
+                    <option value="f">أنثى</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 mt-3">
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">الاسم الأول (كما بالباسبور)</span>
+                  <input type="text" formControlName="givenName" placeholder="مثال: AHMED" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold uppercase focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                </div>
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">اسم العائلة (كما بالباسبور)</span>
+                  <input type="text" formControlName="familyName" placeholder="مثال: ALOMARI" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold uppercase focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                </div>
+              </div>
+
+              <div class="space-y-1.5 mt-3">
+                <span class="block text-xs font-bold text-slate-500">تاريخ الميلاد</span>
+                <input type="date" formControlName="bornOn" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-bold focus:border-amber-500 focus:bg-white focus:outline-none transition">
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 mt-3">
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">البريد الإلكتروني للراكب</span>
+                  <input type="email" formControlName="email" placeholder="passenger@example.com" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                </div>
+                <div class="space-y-1.5">
+                  <span class="block text-xs font-bold text-slate-500">رقم الهاتف</span>
+                  <input type="tel" formControlName="phoneNumber" placeholder="+966500000000" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:bg-white focus:outline-none transition">
+                </div>
+              </div>
+            </div>
+
+            <!-- Receipt Fields — فقط لو تحويل بنكي -->
+            @if (app.paymentMethod() === 'bank') {
+              <div class="border-t border-slate-150 pt-4 space-y-4">
+                <span class="text-xs font-black text-slate-900 block">إثبات الدفع والتحويل البنكي للمنصة:</span>
+
+                <div class="border border-slate-200 rounded-2xl p-4 bg-slate-50/50 space-y-4" id="hold-receipt-fields">
+                  <div class="space-y-1.5">
+                    <span class="block text-xs font-black text-slate-800">رقم إيصال التحويل البنكي / مرجع المعاملة <span class="text-rose-500">*</span></span>
+                    <input type="text" [value]="app.modalReceiptNumber()" (input)="app.modalReceiptNumber.set($any($event.target).value)"
+                           placeholder="مثال: BankTRX9871" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold focus:border-amber-500 focus:outline-none transition">
+                  </div>
+
+                  <div class="space-y-2">
+                    <span class="block text-xs font-black text-slate-800">تحميل صورة إيصال الدفع <span class="text-rose-500">*</span></span>
+
+                    <div class="relative border-2 border-dashed border-slate-200 hover:border-amber-400 bg-white rounded-2xl p-4 text-center cursor-pointer transition">
+                      <input type="file" (change)="app.onModalFileSelected($event)" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
+                      @if (app.modalReceiptImg()) {
+                        <div class="space-y-2">
+                          <mat-icon class="text-emerald-500">check_circle</mat-icon>
+                          <span class="block text-xs font-bold text-emerald-700">تم إرفاق صورة الإيصال بنجاح</span>
+                        </div>
+                      } @else {
+                        <div class="space-y-1">
+                          <mat-icon class="text-slate-400 text-2xl">cloud_upload</mat-icon>
+                          <p class="text-[11px] font-bold text-slate-600">اسحب أو حدد ملف صورة الإيصال</p>
+                          <span class="text-[9px] text-slate-400 block">PNG, JPG (الحد الأقصى 5 ميجابايت)</span>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (app.bookingError()) {
+              <div class="rounded-xl border border-rose-100 bg-rose-50/50 p-4 text-xs font-semibold text-rose-700 leading-relaxed">
+                ⚠️ {{ app.bookingError() }}
+              </div>
+            }
+
+            <!-- Submit Button -->
+            <div class="pt-2">
+              <button type="button" (click)="app.submitBookingModal()"
+                      [disabled]="app.bookingLoading() || (app.paymentMethod() === 'bank' && !app.modalReceiptNumber().trim())"
+                      class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-4 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/10 transition active:scale-95 disabled:opacity-50">
+                <mat-icon class="text-sm">done_all</mat-icon>
+                <span>
+                  @if (app.paymentMethod() === 'wallet') {
+                    تأكيد الحجز والخصم من المحفظة
+                  } @else {
+                    تأكيد الحجز ورفع إيصال التحويل
+                  }
+                </span>
+              </button>
+
+              @if (app.bookingLoading()) {
+                <div class="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500 pt-3">
+                  <svg class="animate-spin h-5 w-5 text-slate-700" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>جاري تأكيد حجز الرحلة وتثبيت المقعد بـ Duffel...</span>
+                </div>
+              }
+            </div>
+
+          </form>
+        }
+
+      </div>
+
+    </div>
+  </div>
+}

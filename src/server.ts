@@ -67,7 +67,7 @@ interface LocalOrder {
   user_id?: string;
   receipt_number?: string;
   receipt_img?: string;
-  admin_review_status?: 'pending_receipt' | 'pending_approval' | 'approved' | 'rejected';
+  admin_review_status?: 'pending_receipt' | 'pending_approval' | 'approved' | 'rejected' | 'booking_in_progress' | 'completed';
   is_hold_booking?: boolean;
   markup_percentage_at_booking?: number;
   office_markup_amount?: number;
@@ -81,7 +81,7 @@ interface Settings {
 }
 
 const appSettings: Settings = {
-  office_markup_percentage: 5 // Default 5% markup
+  office_markup_percentage: 50 // Default 50% markup
 };
 
 // In-memory collections with high quality mock seed data
@@ -280,21 +280,31 @@ interface DuffelCancellationResponse {
  */
 app.post('/api/search', async (req, res) => {
   try {
-    const { origin, destination, departure_date, cabin_class, passengers } = req.body as { origin?: string; destination?: string; departure_date?: string; cabin_class?: string; passengers?: unknown[] };
+    const { origin, destination, departure_date, return_date, cabin_class, passengers } = req.body as { origin?: string; destination?: string; departure_date?: string; return_date?: string; cabin_class?: string; passengers?: unknown[] };
     if (!origin || !destination || !departure_date) {
       res.status(400).json({ error: 'الأصل والوجهة وتاريخ المغادرة مطلوبة.' });
       return;
     }
 
+    const slices = [
+      {
+        origin,
+        destination,
+        departure_date
+      }
+    ];
+
+    if (return_date) {
+      slices.push({
+        origin: destination,
+        destination: origin,
+        departure_date: return_date
+      });
+    }
+
     const payload = {
       data: {
-        slices: [
-          {
-            origin,
-            destination,
-            departure_date
-          }
-        ],
+        slices,
         passengers: passengers || [{ type: 'adult' }],
         cabin_class: cabin_class || 'economy'
       }
@@ -308,15 +318,23 @@ app.post('/api/search', async (req, res) => {
     const offerRequest = (duffelResponse['data'] || {}) as DuffelOfferRequestResponse;
     const rawOffers = (offerRequest.offers || []) as DuffelOfferRaw[];
     
-    const offers = rawOffers.map((offer: DuffelOfferRaw) => ({
-      id: offer.id,
-      total_amount: offer.total_amount,
-      total_currency: offer.total_currency,
-      owner: offer.owner || { name: 'Unknown Airline' },
-      slices: offer.slices,
-      requires_instant_payment: offer.payment_requirements?.requires_instant_payment ?? true,
-      hold_supported: !offer.payment_requirements?.requires_instant_payment
-    }));
+    const markupPct = appSettings.office_markup_percentage;
+    const offers = rawOffers.map((offer: DuffelOfferRaw) => {
+      const duffelTotal = Number(offer.total_amount || 0);
+      const markupAmount = Number((duffelTotal * (markupPct / 100)).toFixed(2));
+      const officeTotalAmount = Number((duffelTotal + markupAmount).toFixed(2));
+      return {
+        id: offer.id,
+        total_amount: String(officeTotalAmount),
+        total_currency: offer.total_currency,
+        owner: offer.owner || { name: 'Unknown Airline' },
+        slices: offer.slices,
+        requires_instant_payment: offer.payment_requirements?.requires_instant_payment ?? true,
+        hold_supported: !offer.payment_requirements?.requires_instant_payment,
+        base_amount: String(duffelTotal),
+        markup_amount: String(markupAmount)
+      };
+    });
 
     res.json({
       offer_request_id: offerRequest.id,
@@ -584,91 +602,87 @@ app.post('/api/admin/deposits/:id/reject', (req, res) => {
 });
 
 /**
- * 10. POST /api/orders/hold -> POST /air/orders (type = "hold")
+ * 10. POST /api/orders/hold -> Create local offline hold booking
  */
-app.post('/api/orders/hold', async (req, res) => {
+app.post('/api/orders/hold', (req, res) => {
   try {
     const user = getActiveUser(req);
-    const { offer_id, passengers, route_summary, owner_name } = req.body as { offer_id?: string; passengers?: Record<string, unknown>[]; route_summary?: string; owner_name?: string };
-    if (!offer_id || !passengers) {
-      res.status(400).json({ error: 'offer_id matches and passenger details are required' });
+    const { offer_id, passengers, route_summary, owner_name, receipt_number, receipt_img, total_amount, total_currency } = req.body as { 
+      offer_id?: string; 
+      passengers?: Record<string, unknown>[]; 
+      route_summary?: string; 
+      owner_name?: string;
+      receipt_number?: string;
+      receipt_img?: string;
+      total_amount?: string;
+      total_currency?: string;
+    };
+    if (!offer_id || !passengers || !total_amount) {
+      res.status(400).json({ error: 'بيانات الحجز المؤقت غير كاملة.' });
       return;
     }
 
-    // Call Duffel to create hold order
-    const payload = {
-      data: {
-        type: 'hold',
-        selected_offers: [offer_id],
-        passengers
-      }
-    };
-
-    const duffelResponse = await fetchDuffel('/air/orders', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    const duffelOrder = (duffelResponse['data'] || {}) as DuffelOrderResponse;
-
+    const clientTotal = Number(total_amount);
     const markupPct = appSettings.office_markup_percentage;
-    const duffelTotal = Number(duffelOrder.total_amount || 0);
-    const office_markup_amount = Number((duffelTotal * (markupPct / 100)).toFixed(2));
-    const office_total_amount = Number((duffelTotal + office_markup_amount).toFixed(2));
-    const base_amount = duffelOrder.base_amount || (duffelTotal * 0.85).toFixed(2);
-    const tax_amount = duffelOrder.tax_amount || (duffelTotal * 0.15).toFixed(2);
+    const base_amount = Number((clientTotal / (1 + markupPct / 100)).toFixed(2));
+    const office_markup_amount = Number((clientTotal - base_amount).toFixed(2));
+    const tax_amount = Number((base_amount * 0.15).toFixed(2));
+
+    const orderId = 'brq_ord_' + Math.random().toString(36).substr(2, 9);
+    const bookingRef = 'BRQ' + Math.floor(100000 + Math.random() * 900000);
+
+    const hasReceipt = !!(receipt_number && receipt_number.trim());
 
     const newOrder: LocalOrder = {
-      id: duffelOrder.id,
-      booking_reference: duffelOrder.booking_reference,
-      total_amount: duffelOrder.total_amount,
-      total_currency: duffelOrder.total_currency,
-      payment_status: duffelOrder.payment_status,
-      payment_required_by: duffelOrder.payment_required_by,
-      passengers: (duffelOrder.passengers as unknown as Record<string, unknown>[]) || [],
+      id: orderId,
+      booking_reference: bookingRef,
+      total_amount: String(clientTotal),
+      total_currency: total_currency || 'USD',
+      payment_status: hasReceipt ? 'paid' : 'unpaid',
+      payment_required_by: new Date(Date.now() + 3600000 * 24).toISOString(), // 24 hours hold
+      passengers: passengers || [],
       route: route_summary || 'Unknown Route',
-      owner_name: owner_name || 'Unknown Airline',
+      owner_name: owner_name || 'طيران شريك',
       status: 'awaiting_payment',
       created_at: new Date().toISOString(),
       user_id: user.id,
       is_hold_booking: true,
-      admin_review_status: 'pending_receipt',
+      receipt_number: receipt_number || undefined,
+      receipt_img: receipt_img || undefined,
+      admin_review_status: hasReceipt ? 'pending_approval' : 'pending_receipt',
       markup_percentage_at_booking: markupPct,
       office_markup_amount,
-      office_total_amount,
+      office_total_amount: clientTotal,
       base_amount: String(base_amount),
-      tax_amount: String(tax_amount)
+      tax_amount: String(tax_amount),
+      tickets: []
     };
 
     orders.push(newOrder);
 
-    // Notify user of hold order creation
+    // Notify user
     notifications.push({
       id: 'notif_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
-      title: 'تم حجز رحلتك مؤقتاً ⏳',
-      message: `تم إنشاء حجز مؤقت لرحلتك برقم مرجعي ${newOrder.booking_reference}. الرجاء إيداع قيمة التذكرة $${newOrder.total_amount} USD ورفع الإيصال لتأكيد الحجز قبل تاريخ انتهاء الصلاحية.`,
+      title: hasReceipt ? 'تم تقديم إيصال سداد حجزك المؤقت ⏳' : 'تم حجز رحلتك مؤقتاً ⏳',
+      message: hasReceipt 
+        ? `تم إنشاء حجز مؤقت لرحلتك برقم مرجعي ${bookingRef} وتلقي إيصال السداد رقم ${receipt_number}. يقوم موظفو الخدمة بمراجعته الآن لتأكيد الحجز وإصدار التذاكر.`
+        : `تم إنشاء حجز مؤقت لرحلتك برقم مرجعي ${bookingRef}. يرجى تحويل مبلغ $${clientTotal.toFixed(2)} USD ورفع الإيصال لتأكيد الحجز قبل انتهاء المهلة.`,
       read: false,
       created_at: new Date().toISOString()
     });
 
     res.json(newOrder);
   } catch (err: unknown) {
-    console.error('Duffel Hold Order Error:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message,
-      code: error.code,
-      title: error.title
-    });
+    console.error('Error creating hold order:', err);
+    res.status(500).json({ error: 'فشل إتمام الحجز المؤقت.' });
   }
 });
 
 /**
- * 11. POST /api/orders/instant -> Instant booking (No hold supported)
- * Deducts wallet balance, then calls Duffel to book with type "instant".
+ * 11. POST /api/orders/instant -> Local instant booking from user's wallet
  */
-app.post('/api/orders/instant', async (req, res) => {
+app.post('/api/orders/instant', (req, res) => {
   try {
     const user = getActiveUser(req);
     const { offer_id, passengers, route_summary, owner_name, total_amount, total_currency } = req.body as { 
@@ -685,277 +699,373 @@ app.post('/api/orders/instant', async (req, res) => {
       return;
     }
 
-    const price = Number(total_amount);
-
-    // Check user's wallet balance
-    if (user.wallet_balance < price) {
-      res.status(400).json({ error: `رصيد المحفظة الحالي غير كافٍ لإتمام الدفع الفوري ($${user.wallet_balance.toFixed(2)} USD). قيمة التذكرة هي $${price.toFixed(2)} USD. يرجى شحن محفظتك أولاً.` });
+    const clientTotal = Number(total_amount);
+    if (user.wallet_balance < clientTotal) {
+      res.status(400).json({ error: `رصيد المحفظة الحالي غير كافٍ لإتمام الحجز ($${user.wallet_balance.toFixed(2)} USD). القيمة المطلوبة هي $${clientTotal.toFixed(2)} USD.` });
       return;
     }
 
     // Deduct user balance
-    user.wallet_balance -= price;
-
-    // Call Duffel to create instant order
-    const payload = {
-      data: {
-        type: 'instant',
-        selected_offers: [offer_id],
-        passengers,
-        payments: [
-          {
-            type: 'balance',
-            amount: total_amount,
-            currency: total_currency || 'USD'
-          }
-        ]
-      }
-    };
-
-    const duffelResponse = await fetchDuffel('/air/orders', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    const duffelOrder = (duffelResponse['data'] || {}) as DuffelOrderResponse;
-
-    const tickets: Record<string, string>[] = [];
-    if (duffelOrder.passengers) {
-      duffelOrder.passengers.forEach((p: DuffelPassengerRaw) => {
-        if (p.ticket) {
-          tickets.push({
-            passenger_name: `${p.given_name} ${p.family_name}`,
-            ticket_number: p.ticket.ticket_number
-          });
-        } else if (p.tickets && Array.isArray(p.tickets)) {
-          p.tickets.forEach((t: { ticket_number: string }) => {
-            tickets.push({
-              passenger_name: `${p.given_name} ${p.family_name}`,
-              ticket_number: t.ticket_number
-            });
-          });
-        }
-      });
-    }
-
-    if (tickets.length === 0) {
-      tickets.push({ passenger_name: 'جميع الركاب', ticket_number: 'ETKT-' + Math.floor(Math.random() * 1000000000000) });
-    }
+    user.wallet_balance -= clientTotal;
 
     const markupPct = appSettings.office_markup_percentage;
-    const duffelTotal = Number(duffelOrder.total_amount || 0);
-    const office_markup_amount = Number((duffelTotal * (markupPct / 100)).toFixed(2));
-    const office_total_amount = Number((duffelTotal + office_markup_amount).toFixed(2));
-    const base_amount = duffelOrder.base_amount || (duffelTotal * 0.85).toFixed(2);
-    const tax_amount = duffelOrder.tax_amount || (duffelTotal * 0.15).toFixed(2);
+    const base_amount = Number((clientTotal / (1 + markupPct / 100)).toFixed(2));
+    const office_markup_amount = Number((clientTotal - base_amount).toFixed(2));
+    const tax_amount = Number((base_amount * 0.15).toFixed(2));
+
+    const orderId = 'brq_ord_' + Math.random().toString(36).substr(2, 9);
+    const bookingRef = 'BRQ' + Math.floor(100000 + Math.random() * 900000);
 
     const newOrder: LocalOrder = {
-      id: duffelOrder.id,
-      booking_reference: duffelOrder.booking_reference,
-      total_amount: duffelOrder.total_amount,
-      total_currency: duffelOrder.total_currency,
-      payment_status: duffelOrder.payment_status || 'paid',
+      id: orderId,
+      booking_reference: bookingRef,
+      total_amount: String(clientTotal),
+      total_currency: total_currency || 'USD',
+      payment_status: 'paid',
       payment_required_by: null,
-      passengers: (duffelOrder.passengers as unknown as Record<string, unknown>[]) || [],
+      passengers: passengers || [],
       route: route_summary || 'Unknown Route',
-      owner_name: owner_name || 'Unknown Airline',
-      status: 'confirmed',
+      owner_name: owner_name || 'طيران شريك',
+      status: 'awaiting_payment',
       created_at: new Date().toISOString(),
       user_id: user.id,
       is_hold_booking: false,
-      admin_review_status: 'approved',
-      tickets,
+      admin_review_status: 'pending_approval', // Awaiting admin ticket issuance
       markup_percentage_at_booking: markupPct,
       office_markup_amount,
-      office_total_amount,
+      office_total_amount: clientTotal,
       base_amount: String(base_amount),
-      tax_amount: String(tax_amount)
+      tax_amount: String(tax_amount),
+      tickets: []
     };
 
     orders.push(newOrder);
 
-    // Notify user of successful booking
     notifications.push({
       id: 'notif_' + Math.random().toString(36).substr(2, 9),
       user_id: user.id,
-      title: 'تم إصدار تذكرتك بنجاح ✈️',
-      message: `تم تأكيد حجزك الفوري للرحلة ${newOrder.route} برقم حجز ${newOrder.booking_reference}. تم إصدار التذاكر الإلكترونية بنجاح!`,
+      title: 'تم خصم قيمة الحجز المباشر وجاري إصداره ⏳',
+      message: `تم دفع قيمة حجزك رقم ${bookingRef} بقيمة $${clientTotal.toFixed(2)} USD من محفظتك بنجاح. جاري مراجعة وإصدار التذاكر الإلكترونية من قبل خدمة العملاء قريباً.`,
       read: false,
       created_at: new Date().toISOString()
     });
 
     res.json(newOrder);
   } catch (err: unknown) {
-    console.error('Duffel Instant Order Error:', err);
-    const error = err as DuffelError;
-    // Refund the deducted amount in case of api failure
-    const user = getActiveUser(req);
-    const { total_amount } = req.body as { total_amount?: string };
-    if (total_amount) {
-      user.wallet_balance += Number(total_amount);
-    }
-
-    res.status(error.status || 500).json({
-      error: error.message || 'حدث خطأ في نظام حجز دافيل الفوري. تم استرداد مبلغ التذكرة إلى محفظتك.',
-      code: error.code,
-      title: error.title
-    });
+    console.error('Error in instant order:', err);
+    res.status(500).json({ error: 'حدث خطأ غير متوقع أثناء الحجز الفوري.' });
   }
 });
 
 /**
- * 12. GET /api/orders
+ * 12. GET /api/orders (Current user's local orders)
  */
-/**
- * 12. GET /api/orders (current user's orders, sourced live from Duffel)
- */
-/**
- * 12. GET /api/orders (current user's orders, matched by passenger email, sourced live from Duffel)
- */
-app.get('/api/orders', async (req, res) => {
+app.get('/api/orders', (req, res) => {
   try {
     const user = getActiveUser(req);
-    const userEmail = user.email.toLowerCase().trim();
-
-    const duffelOrders = await fetchAllDuffelOrders();
-
-    const merged = duffelOrders
-      .map((d: any) => {
-        // Match order to this agent by comparing passenger email(s) with the agent's email
-        const passengers = (d.passengers || []) as { email?: string }[];
-        const belongsToUser = passengers.some(
-          p => (p.email || '').toLowerCase().trim() === userEmail
-        );
-        if (!belongsToUser) return null;
-
-        // Merge with local metadata if we still have it (receipt, markup, tickets)
-        const local = orders.find(o => o.id === d.id);
-
-        const markupPct = local?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
-        const duffelTotal = Number(d.total_amount || 0);
-        const officeMarkupAmt = local?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
-        const officeTotalAmt = local?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
-
-        const isPaid = !!d.payment_status?.paid_at;
-        const derivedStatus: 'awaiting_payment' | 'confirmed' | 'cancelled' =
-          local?.status === 'cancelled' ? 'cancelled' : (isPaid ? 'confirmed' : 'awaiting_payment');
-
-        const routeFromSlices = Array.isArray(d.slices) && d.slices.length > 0
-          ? d.slices.map((s: any) => `${s.origin?.iata_code || '?'} ➔ ${s.destination?.iata_code || '?'}`).join(' | ')
-          : 'Unknown Route';
-
-        return {
-          id: d.id,
-          booking_reference: d.booking_reference,
-          total_amount: d.total_amount,
-          total_currency: d.total_currency,
-          payment_status: isPaid ? 'paid' : 'awaiting_payment',
-          payment_required_by: d.payment_required_by || local?.payment_required_by || null,
-          passengers: d.passengers || [],
-          route: local?.route || routeFromSlices,
-          owner_name: d.owner?.name || local?.owner_name || 'Unknown Airline',
-          status: derivedStatus,
-          created_at: d.created_at || local?.created_at || new Date().toISOString(),
-          user_id: local?.user_id || user.id,
-          receipt_number: local?.receipt_number,
-          admin_review_status: local?.admin_review_status,
-          is_hold_booking: local?.is_hold_booking ?? true,
-          markup_percentage_at_booking: markupPct,
-          office_markup_amount: officeMarkupAmt,
-          office_total_amount: officeTotalAmt,
-          tickets: local?.tickets || [],
-        };
-      })
-      .filter((o): o is NonNullable<typeof o> => o !== null);
-
-    res.json(merged.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+    const userOrders = orders.filter(o => o.user_id === user.id);
+    res.json(userOrders.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
   } catch (err: unknown) {
-    console.error('Error fetching user orders from Duffel:', err);
+    console.error('Error fetching user orders:', err);
     res.status(500).json({ error: 'فشل في جلب قائمة الحجوزات الخاصة بك.' });
   }
 });
+
 /**
- * 12b. GET /api/orders/:order_id
- * Returns details for a single order, fetching live data from Duffel if possible, and merging with local data and markup calculations.
+ * 12b. GET /api/orders/:order_id (Details for a local order)
  */
-app.get('/api/orders/:order_id', async (req, res) => {
+app.get('/api/orders/:order_id', (req, res) => {
   try {
     const { order_id } = req.params;
-    
-    // Find local order to get local status & markup details
     const localOrder = orders.find(o => o.id === order_id);
-    
-    // Fetch latest live order details from Duffel
-    let duffelOrder: DuffelFullOrderDetails | null = null;
-    try {
-      const duffelResponse = await fetchDuffel(`/air/orders/${order_id}`);
-      duffelOrder = duffelResponse['data'] as unknown as DuffelFullOrderDetails;
-    } catch (duffelErr) {
-      console.warn(`Could not fetch live order details for ${order_id} from Duffel:`, duffelErr);
+    if (!localOrder) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+    res.json(localOrder);
+  } catch (err: unknown) {
+    console.error('Error fetching order details:', err);
+    res.status(500).json({ error: 'حدث خطأ أثناء جلب تفاصيل الحجز.' });
+  }
+});
+
+/**
+ * 13. GET /api/admin/orders (Returns all system orders)
+ */
+app.get('/api/admin/orders', (req, res) => {
+  try {
+    res.json(orders.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
+  } catch (err: unknown) {
+    console.error('Error fetching admin orders:', err);
+    res.status(500).json({ error: 'فشل جلب طلبات النظام للإدارة.' });
+  }
+});
+
+/**
+ * 14. POST /api/orders/:order_id/receipt (Upload receipt for hold booking)
+ */
+app.post('/api/orders/:order_id/receipt', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { receipt_number, receipt_img } = req.body as { receipt_number?: string; receipt_img?: string };
+
+    if (!receipt_number) {
+      res.status(400).json({ error: 'رقم الإيصال أو مرجع التحويل مطلوب.' });
+      return;
     }
 
-    if (!localOrder && !duffelOrder) {
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
       res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
       return;
     }
 
-    // Prepare markup info
-    const markupPct = localOrder?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
-    const duffelTotal = Number(duffelOrder?.total_amount || localOrder?.total_amount || 0);
-    const officeMarkupAmt = localOrder?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
-    const officeTotalAmt = localOrder?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
-    
-    const baseAmt = localOrder?.base_amount || duffelOrder?.base_amount || (duffelTotal * 0.85).toFixed(2);
-    const taxAmt = localOrder?.tax_amount || duffelOrder?.tax_amount || (duffelTotal * 0.15).toFixed(2);
+    order.receipt_number = receipt_number;
+    order.receipt_img = receipt_img || 'default_receipt';
+    order.payment_status = 'paid';
+    order.admin_review_status = 'pending_approval'; // Awaiting admin ticket issuance
 
-    // Merge everything
-    const mergedOrder = {
-      id: order_id,
-      booking_reference: duffelOrder?.booking_reference || localOrder?.booking_reference || 'Hold',
-      status: localOrder?.status || 'awaiting_payment',
-      duffel_status: duffelOrder?.status || 'pending',
-      payment_status: duffelOrder?.payment_status || localOrder?.payment_status || 'awaiting_payment',
-      payment_required_by: duffelOrder?.payment_required_by || localOrder?.payment_required_by,
-      
-      // Itinerary / Slices
-      slices: duffelOrder?.slices || [],
-      owner_name: duffelOrder?.owner?.name || localOrder?.owner_name || 'Unknown Airline',
-      owner_logo: duffelOrder?.owner?.logo_symbol_url || '',
-      route: localOrder?.route || 'Unknown Route',
-      
-      // Passengers & documents
-      passengers: duffelOrder?.passengers || localOrder?.passengers || [],
-      documents: duffelOrder?.documents || [],
-      conditions: duffelOrder?.conditions || {
-        refund_before_departure: null,
-        change_before_departure: null
-      },
-      available_actions: duffelOrder?.available_actions || [],
+    if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'إيصال الدفع قيد المراجعة ⏳',
+        message: `تم رفع إيصال الدفع رقم ${receipt_number} لحجزك ${order.booking_reference}. يقوم موظفو خدمة العملاء بمراجعته وتأكيد الحجز قريباً.`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
 
-      // Pricing Breakdown
-      base_amount: baseAmt,
-      tax_amount: taxAmt,
-      total_amount: duffelTotal.toFixed(2),
-      total_currency: duffelOrder?.total_currency || localOrder?.total_currency || 'USD',
-      
-      // Markup pricing
-      markup_percentage_at_booking: markupPct,
-      office_markup_amount: officeMarkupAmt,
-      office_total_amount: officeTotalAmt,
+    res.json({ success: true, order });
+  } catch (err: unknown) {
+    console.error('Error uploading receipt:', err);
+    res.status(500).json({ error: 'حدث خطأ أثناء رفع إيصال السداد.' });
+  }
+});
 
-      // Local tracking fields
-      receipt_number: localOrder?.receipt_number,
-      receipt_img: localOrder?.receipt_img,
-      admin_review_status: localOrder?.admin_review_status,
-      is_hold_booking: localOrder?.is_hold_booking ?? true,
-      created_at: localOrder?.created_at || new Date().toISOString(),
-      tickets: localOrder?.tickets || []
+/**
+ * 15. POST /api/orders/:order_id/pay (Pay a hold booking using wallet balance)
+ */
+app.post('/api/orders/:order_id/pay', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+
+    const user = getActiveUser(req);
+    const cost = order.office_total_amount || Number(order.total_amount);
+
+    if (user.wallet_balance < cost) {
+      res.status(400).json({ error: `رصيد المحفظة غير كافٍ لإتمام الدفع ($${user.wallet_balance.toFixed(2)} USD). القيمة المطلوبة هي $${cost.toFixed(2)} USD.` });
+      return;
+    }
+
+    user.wallet_balance -= cost;
+    order.payment_status = 'paid';
+    order.admin_review_status = 'pending_approval'; // Awaiting admin ticket upload
+
+    if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'تم دفع قيمة الحجز المؤقت بنجاح 💰',
+        message: `تم دفع $${cost.toFixed(2)} USD قيمة الحجز المؤقت رقم ${order.booking_reference} من محفظتك الإلكترونية بنجاح. جاري مراجعة وإصدار التذاكر قريباً.`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, order });
+  } catch (err: unknown) {
+    console.error('Error paying hold booking:', err);
+    res.status(500).json({ error: 'فشل إتمام عملية الدفع.' });
+  }
+});
+
+/**
+ * 16. GET /api/orders/:order_id/refresh (Refresh details - return local order)
+ */
+app.get('/api/orders/:order_id/refresh', (req, res) => {
+  const { order_id } = req.params;
+  const order = orders.find(o => o.id === order_id);
+  if (!order) {
+    res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+    return;
+  }
+  res.json(order);
+});
+
+/**
+ * 17. POST /api/orders/:order_id/cancel (Cancel order and refund if paid)
+ */
+app.post('/api/orders/:order_id/cancel', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+
+    order.status = 'cancelled';
+    order.admin_review_status = 'rejected';
+
+    // Refund if paid via wallet
+    if (!order.is_hold_booking && order.payment_status === 'paid' && order.user_id) {
+      const user = users.find(u => u.id === order.user_id);
+      if (user) {
+        const cost = order.office_total_amount || Number(order.total_amount);
+        user.wallet_balance += cost;
+        notifications.push({
+          id: 'notif_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          title: 'تم استرداد مبلغ الحجز لمحفظتك 💰',
+          message: `تم إلغاء الحجز رقم ${order.booking_reference} بنجاح. تم إعادة المبلغ بالكامل $${cost.toFixed(2)} USD إلى محفظتك الإلكترونية.`,
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      }
+    } else if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'تم إلغاء طلب حجزك ❌',
+        message: `تم إلغاء الحجز المؤقت رقم ${order.booking_reference} بنجاح. لمزيد من الاستفسار يرجى التواصل مع خدمة العملاء.`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, message: 'تم إلغاء الحجز بنجاح.', order });
+  } catch (err: unknown) {
+    console.error('Error cancelling order:', err);
+    res.status(500).json({ error: 'فشل إلغاء الحجز.' });
+  }
+});
+
+/**
+ * 18. POST /api/admin/orders/:order_id/accept (Admin starts booking process)
+ */
+app.post('/api/admin/orders/:order_id/accept', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+
+    order.admin_review_status = 'booking_in_progress';
+
+    if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'حجزك قيد الإصدار الآن ✈️',
+        message: `تمت الموافقة على طلب حجزك رقم ${order.booking_reference}. جاري الآن حجز المقاعد وإصدار التذاكر الإلكترونية يدوياً وسنقوم بإشعارك فور انتهائها.`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, order });
+  } catch (err: unknown) {
+    console.error('Error accepting admin order:', err);
+    res.status(500).json({ error: 'فشل قبول طلب الحجز.' });
+  }
+});
+
+/**
+ * 19. POST /api/admin/orders/:order_id/reject (Admin rejects order & refund if paid)
+ */
+app.post('/api/admin/orders/:order_id/reject', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+
+    order.status = 'cancelled';
+    order.admin_review_status = 'rejected';
+
+    // Refund if paid via wallet
+    if (order.payment_status === 'paid' && order.user_id) {
+      const user = users.find(u => u.id === order.user_id);
+      if (user) {
+        const cost = order.office_total_amount || Number(order.total_amount);
+        user.wallet_balance += cost;
+        notifications.push({
+          id: 'notif_' + Math.random().toString(36).substr(2, 9),
+          user_id: user.id,
+          title: 'تم استرداد مبلغ الحجز لمحفظتك 💰',
+          message: `تم رفض الحجز رقم ${order.booking_reference} من قبل الإدارة. تم إعادة المبلغ بالكامل $${cost.toFixed(2)} USD إلى محفظتك الإلكترونية.`,
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      }
+    } else if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'تم رفض طلب حجزك ❌',
+        message: `نأسف، تم رفض طلب حجزك رقم ${order.booking_reference}. لمزيد من التفاصيل يرجى التواصل مع خدمة العملاء.`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, order });
+  } catch (err: unknown) {
+    console.error('Error rejecting admin order:', err);
+    res.status(500).json({ error: 'فشل رفض الحجز.' });
+  }
+});
+
+/**
+ * 20. POST /api/admin/orders/:order_id/finalize (Admin inputs PNR and tickets)
+ */
+app.post('/api/admin/orders/:order_id/finalize', (req, res) => {
+  try {
+    const { order_id } = req.params;
+    const { booking_reference, tickets } = req.body as { 
+      booking_reference?: string; 
+      tickets?: { passenger_name: string; ticket_number: string }[] 
     };
 
-    res.json(mergedOrder);
+    const order = orders.find(o => o.id === order_id);
+    if (!order) {
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      return;
+    }
+
+    if (booking_reference) {
+      order.booking_reference = booking_reference;
+    }
+    order.tickets = tickets || [];
+    order.status = 'confirmed';
+    order.payment_status = 'paid';
+    order.admin_review_status = 'completed';
+
+    if (order.user_id) {
+      notifications.push({
+        id: 'notif_' + Math.random().toString(36).substr(2, 9),
+        user_id: order.user_id,
+        title: 'تم تأكيد حجزك وإصدار التذاكر! 🎉✈️',
+        message: `مبروك! تم إنهاء الحجز وإصدار التذاكر الإلكترونية بنجاح لحجزك رقم ${order.booking_reference}. يمكنك الآن فتح الحجز وتنزيل تذكرتك الإلكترونية (PDF).`,
+        read: false,
+        created_at: new Date().toISOString()
+      });
+    }
+
+    res.json({ success: true, order });
   } catch (err: unknown) {
-    console.error('Error fetching merged order details:', err);
-    res.status(500).json({ error: 'حدث خطأ أثناء جلب تفاصيل الحجز.' });
+    console.error('Error finalizing admin order:', err);
+    res.status(500).json({ error: 'فشل تأكيد وإصدار تذاكر الحجز.' });
   }
 });
 
@@ -1023,26 +1133,15 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
     const { order_id } = req.params;
     const localOrder = orders.find(o => o.id === order_id);
 
-    let duffelOrder: any = null;
-    try {
-      const duffelResponse = await fetchDuffel(`/air/orders/${order_id}`);
-      duffelOrder = duffelResponse['data'];
-    } catch (duffelErr) {
-      console.warn(`Could not fetch live order details for ${order_id} from Duffel for PDF:`, duffelErr);
-    }
-
-    if (!localOrder && !duffelOrder) {
+    if (!localOrder) {
       res.status(404).send('Booking details not found.');
       return;
     }
 
-    const booking_reference = duffelOrder?.booking_reference || localOrder?.booking_reference || 'HOLD';
-    const markupPct = localOrder?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
-    const duffelTotal = Number(duffelOrder?.total_amount || localOrder?.total_amount || 0);
-    const officeMarkupAmt = localOrder?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
-    const officeTotalAmt = localOrder?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
-    const currency = duffelOrder?.total_currency || localOrder?.total_currency || 'USD';
-    const status = localOrder?.status || 'awaiting_payment';
+    const booking_reference = localOrder.booking_reference || 'HOLD';
+    const officeTotalAmt = localOrder.office_total_amount ?? Number(localOrder.total_amount || 0);
+    const currency = localOrder.total_currency || 'USD';
+    const status = localOrder.status || 'awaiting_payment';
 
     const doc = new PDFDocument({ margin: 40, size: 'A4' });
     res.setHeader('Content-Type', 'application/pdf');
@@ -1086,7 +1185,7 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
     setFont(true);
     doc.fillColor(darkSlate).fontSize(14).text('تأكيد حجز الطيران / Booking Confirmation', 300, 40, { align: 'right', width: 250 });
     setFont(false);
-    doc.fillColor(slateGray).fontSize(9).text(`تاريخ الإصدار / Issued: ${new Date(localOrder?.created_at || Date.now()).toLocaleDateString()}`, 300, 65, { align: 'right', width: 250 });
+    doc.fillColor(slateGray).fontSize(9).text(`تاريخ الإصدار / Issued: ${new Date(localOrder.created_at || Date.now()).toLocaleDateString()}`, 300, 65, { align: 'right', width: 250 });
 
     // Divider
     doc.moveTo(40, 95).lineTo(550, 95).strokeColor(borderSlate).lineWidth(1).stroke();
@@ -1107,7 +1206,7 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
     doc.moveTo(40, 200).lineTo(550, 200).strokeColor(borderSlate).lineWidth(1).stroke();
 
     let passengerY = 210;
-    const passengers = duffelOrder?.passengers || localOrder?.passengers || [];
+    const passengers = localOrder.passengers || [];
     
     setFont(false);
     passengers.forEach((p: any, i: number) => {
@@ -1124,47 +1223,16 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
     doc.moveTo(40, passengerY + 30).lineTo(550, passengerY + 30).strokeColor(borderSlate).lineWidth(1).stroke();
 
     let itineraryY = passengerY + 40;
-    const slices = duffelOrder?.slices || [];
-
-    if (slices.length === 0) {
-      doc.rect(40, itineraryY, 510, 45).fill(lightSlate).strokeColor(borderSlate).stroke();
-      setFont(true);
-      doc.fillColor(darkSlate).fontSize(10).text('مسار الرحلة / Route:', 55, itineraryY + 15);
-      setFont(false);
-      doc.fillColor(slateGray).fontSize(10).text(localOrder?.route || 'CAI -> JED', 180, itineraryY + 15);
-      setFont(true);
-      doc.fillColor(darkSlate).fontSize(10).text('الناقل / Airline:', 350, itineraryY + 15);
-      setFont(false);
-      doc.fillColor(slateGray).fontSize(10).text(localOrder?.owner_name || 'طيران شريك', 450, itineraryY + 15);
-      itineraryY += 60;
-    } else {
-      slices.forEach((slice: any, sIdx: number) => {
-        setFont(true);
-        doc.fillColor(emerald).fontSize(10).text(`الوجهة ${sIdx + 1} / Flight segment ${sIdx + 1}: ${slice.origin?.iata_code} -> ${slice.destination?.iata_code}`, 40, itineraryY);
-        itineraryY += 15;
-
-        const segments = slice.segments || [];
-        segments.forEach((seg: any) => {
-          doc.rect(40, itineraryY, 510, 65).strokeColor(borderSlate).stroke();
-          
-          setFont(true);
-          doc.fillColor(darkSlate).fontSize(9).text(`الناقل / Flight: ${seg.operating_carrier?.name || duffelOrder?.owner?.name || localOrder?.owner_name || 'طيران شريك'}`, 50, itineraryY + 10);
-          
-          setFont(false);
-          doc.fillColor(slateGray).fontSize(9).text(`مغادرة / Depart: ${new Date(seg.departing_at).toLocaleString('ar-EG', { hour12: true }) || seg.departing_at}`, 50, itineraryY + 26);
-          doc.fillColor(slateGray).fontSize(9).text(`وصول / Arrive: ${new Date(seg.arriving_at).toLocaleString('ar-EG', { hour12: true }) || seg.arriving_at}`, 50, itineraryY + 42);
-
-          setFont(true);
-          doc.fillColor(darkSlate).fontSize(10).text(`${slice.origin?.iata_code} ➔ ${slice.destination?.iata_code}`, 350, itineraryY + 10);
-          
-          setFont(false);
-          doc.fillColor(slateGray).fontSize(9).text(`الدرجة / Cabin: ${slice.cabin_class || 'سياحية / Economy'}`, 350, itineraryY + 26);
-          doc.fillColor(slateGray).fontSize(9).text('الأمتعة المسموحة / Baggage: 1 Piece (23kg)', 350, itineraryY + 42);
-
-          itineraryY += 75;
-        });
-      });
-    }
+    doc.rect(40, itineraryY, 510, 45).fill(lightSlate).strokeColor(borderSlate).stroke();
+    setFont(true);
+    doc.fillColor(darkSlate).fontSize(10).text('مسار الرحلة / Route:', 55, itineraryY + 15);
+    setFont(false);
+    doc.fillColor(slateGray).fontSize(10).text(localOrder.route || 'CAI -> JED', 180, itineraryY + 15);
+    setFont(true);
+    doc.fillColor(darkSlate).fontSize(10).text('الناقل / Airline:', 350, itineraryY + 15);
+    setFont(false);
+    doc.fillColor(slateGray).fontSize(10).text(localOrder.owner_name || 'طيران شريك', 450, itineraryY + 15);
+    itineraryY += 60;
 
     // Tickets Info section
     setFont(true);
@@ -1174,7 +1242,7 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
 
     let ticketsExist = false;
     setFont(false);
-    if (localOrder?.tickets && localOrder.tickets.length > 0) {
+    if (localOrder.tickets && localOrder.tickets.length > 0) {
       localOrder.tickets.forEach((t: any) => {
         doc.fillColor(darkSlate).fontSize(10).text(`المسافر / Passenger: ${t.passenger_name}`, 50, itineraryY);
         setFont(true);
@@ -1183,21 +1251,10 @@ app.get('/api/orders/:order_id/itinerary-pdf', async (req, res) => {
         itineraryY += 20;
         ticketsExist = true;
       });
-    } else if (duffelOrder?.documents && duffelOrder.documents.length > 0) {
-      duffelOrder.documents.forEach((d: any, dIdx: number) => {
-        const pass = duffelOrder.passengers?.[dIdx] || {};
-        const passName = pass.given_name ? `${pass.given_name} ${pass.family_name}` : 'Passenger';
-        doc.fillColor(darkSlate).fontSize(10).text(`المسافر / Passenger: ${passName}`, 50, itineraryY);
-        setFont(true);
-        doc.fillColor(emerald).fontSize(10).text(`رقم التذكرة / E-Ticket: ${d.unique_identifier}`, 300, itineraryY);
-        setFont(false);
-        itineraryY += 20;
-        ticketsExist = true;
-      });
     }
 
     if (!ticketsExist) {
-      doc.fillColor(slateGray).fontSize(9).text('سيتم إصدار أرقام التذاكر الإلكترونية فور مراجعة وتأكيد التحويل المالي.', 50, itineraryY);
+      doc.fillColor(slateGray).fontSize(9).text('سيتم إصدار أرقام التذاكر الإلكترونية فور مراجعة وتأكيد الحجز.', 50, itineraryY);
       itineraryY += 25;
     }
 
@@ -1238,376 +1295,17 @@ app.get('/api/settings/markup', (req, res) => {
  * Updates the markup percentage
  */
 app.put('/api/settings/markup', (req, res) => {
-  const { office_markup_percentage } = req.body as { office_markup_percentage?: number };
-  if (office_markup_percentage === undefined || isNaN(Number(office_markup_percentage)) || Number(office_markup_percentage) < 0) {
-    res.status(400).json({ error: 'نسبة هامش الربح غير صالحة.' });
-    return;
-  }
-  appSettings.office_markup_percentage = Number(office_markup_percentage);
-  res.json({ success: true, settings: appSettings });
-});
-
-/**
- * 13. GET /api/admin/orders (returns all orders)
- */
-/**
- * 13. GET /api/admin/orders (returns all orders, sourced live from Duffel)
- */
-app.get('/api/admin/orders', async (req, res) => {
   try {
-    const duffelOrders = await fetchAllDuffelOrders();
-
-    const merged = duffelOrders.map((d: any) => {
-      // Match with local metadata (user_id, receipt info, markup, tickets) if we have it
-      const local = orders.find(o => o.id === d.id);
-
-      const markupPct = local?.markup_percentage_at_booking ?? appSettings.office_markup_percentage;
-      const duffelTotal = Number(d.total_amount || 0);
-      const officeMarkupAmt = local?.office_markup_amount ?? Number((duffelTotal * (markupPct / 100)).toFixed(2));
-      const officeTotalAmt = local?.office_total_amount ?? Number((duffelTotal + officeMarkupAmt).toFixed(2));
-
-      // Derive status from Duffel's live payment_status object
-      const isPaid = !!d.payment_status?.paid_at;
-      const derivedStatus: 'awaiting_payment' | 'confirmed' | 'cancelled' =
-        local?.status === 'cancelled' ? 'cancelled' : (isPaid ? 'confirmed' : 'awaiting_payment');
-
-      // Build a readable route string from slices if we don't have one locally
-      const routeFromSlices = Array.isArray(d.slices) && d.slices.length > 0
-        ? d.slices.map((s: any) => `${s.origin?.iata_code || '?'} ➔ ${s.destination?.iata_code || '?'}`).join(' | ')
-        : 'Unknown Route';
-
-      return {
-        id: d.id,
-        booking_reference: d.booking_reference,
-        total_amount: d.total_amount,
-        total_currency: d.total_currency,
-        payment_status: isPaid ? 'paid' : 'awaiting_payment',
-        payment_required_by: d.payment_required_by || local?.payment_required_by || null,
-        passengers: d.passengers || [],
-        route: local?.route || routeFromSlices,
-        owner_name: d.owner?.name || local?.owner_name || 'Unknown Airline',
-        owner_logo: d.owner?.logo_symbol_url || '',
-        status: derivedStatus,
-        created_at: d.created_at || local?.created_at || new Date().toISOString(),
-        user_id: local?.user_id,
-        receipt_number: local?.receipt_number,
-        receipt_img: local?.receipt_img,
-        admin_review_status: local?.admin_review_status,
-        is_hold_booking: local?.is_hold_booking ?? true,
-        markup_percentage_at_booking: markupPct,
-        office_markup_amount: officeMarkupAmt,
-        office_total_amount: officeTotalAmt,
-        base_amount: local?.base_amount || (duffelTotal * 0.85).toFixed(2),
-        tax_amount: local?.tax_amount || (duffelTotal * 0.15).toFixed(2),
-        tickets: local?.tickets || [],
-      };
-    });
-
-    res.json(merged.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
-  } catch (err: unknown) {
-    console.error('Error fetching live orders from Duffel:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message || 'فشل جلب الطلبات من دافيل.',
-      code: error.code
-    });
-  }
-});
-
-/**
- * 14. POST /api/orders/:order_id/receipt
- * User uploads transfer receipt details for a hold booking
- */
-app.post('/api/orders/:order_id/receipt', (req, res) => {
-  const { order_id } = req.params;
-  const { receipt_number, receipt_img } = req.body as { receipt_number?: string; receipt_img?: string };
-
-  if (!receipt_number) {
-    res.status(400).json({ error: 'رقم الإيصال أو مرجع التحويل مطلوب.' });
-    return;
-  }
-
-  const order = orders.find(o => o.id === order_id);
-  if (!order) {
-    res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
-    return;
-  }
-
-  order.receipt_number = receipt_number;
-  order.receipt_img = receipt_img || 'default_receipt';
-  order.admin_review_status = 'pending_approval';
-
-  // Create notification for admin (conceptually) and user
-  if (order.user_id) {
-    notifications.push({
-      id: 'notif_' + Math.random().toString(36).substr(2, 9),
-      user_id: order.user_id,
-      title: 'إيصال الدفع قيد المراجعة ⏳',
-      message: `تم رفع إيصال الدفع رقم ${receipt_number} لحجزك ${order.booking_reference}. يقوم موظفو خدمة العملاء بمراجعته وتأكيد التذاكر قريباً.`,
-      read: false,
-      created_at: new Date().toISOString()
-    });
-  }
-
-  res.json({ success: true, order });
-});
-
-/**
- * 15. POST /api/admin/orders/:order_id/confirm
- * Admin approves a hold order by paying with Duffel balance
- */
-app.post('/api/admin/orders/:order_id/confirm', async (req, res) => {
-  try {
-    const { order_id } = req.params;
-
-    // 1. Get latest order from Duffel
-    const getOrderResponse = await fetchDuffel(`/air/orders/${order_id}`);
-    const latestOrder = (getOrderResponse['data'] || {}) as DuffelOrderResponse;
-
-    const total_amount = latestOrder.total_amount;
-    const total_currency = latestOrder.total_currency;
-
-    // 2. Call Duffel payments
-    const payload = {
-      data: {
-        order_id,
-        payment: {
-          type: 'balance',
-          amount: total_amount,
-          currency: total_currency
-        }
-      }
-    };
-
-    await fetchDuffel('/air/payments', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    // 3. Get updated order details with tickets
-    const updatedOrderResponse = await fetchDuffel(`/air/orders/${order_id}`);
-    const finalOrder = (updatedOrderResponse['data'] || {}) as DuffelOrderResponse;
-
-    const idx = orders.findIndex(o => o.id === order_id);
-    const tickets: Record<string, string>[] = [];
-    if (idx !== -1) {
-      orders[idx].status = 'confirmed';
-      orders[idx].payment_status = finalOrder.payment_status || 'paid';
-      orders[idx].booking_reference = finalOrder.booking_reference;
-      orders[idx].admin_review_status = 'approved';
-      
-      // Try to extract ticket details if any are present
-      if (finalOrder.passengers) {
-        finalOrder.passengers.forEach((p: DuffelPassengerRaw) => {
-          if (p.ticket) {
-            tickets.push({
-              passenger_name: `${p.given_name} ${p.family_name}`,
-              ticket_number: p.ticket.ticket_number
-            });
-          } else if (p.tickets && Array.isArray(p.tickets)) {
-            p.tickets.forEach((t: { ticket_number: string }) => {
-              tickets.push({
-                passenger_name: `${p.given_name} ${p.family_name}`,
-                ticket_number: t.ticket_number
-              });
-            });
-          }
-        });
-      }
-      orders[idx].tickets = tickets.length > 0 ? tickets : [{ passenger_name: 'جميع الركاب', ticket_number: 'ETKT-' + Math.floor(Math.random() * 1000000000000) }];
-
-      // Notify user of confirmation and ticket issuance
-      if (orders[idx].user_id) {
-        notifications.push({
-          id: 'notif_' + Math.random().toString(36).substr(2, 9),
-          user_id: orders[idx].user_id!,
-          title: 'تم إصدار التذاكر الإلكترونية ✈️',
-          message: `تم التحقق من إيصالك وتأكيد حجزك رقم مرجعي ${orders[idx].booking_reference} بنجاح. يمكنك الآن الاطلاع على أرقام التذاكر.`,
-          read: false,
-          created_at: new Date().toISOString()
-        });
-      }
+    const { office_markup_percentage } = req.body as { office_markup_percentage?: number };
+    if (office_markup_percentage === undefined || isNaN(Number(office_markup_percentage)) || Number(office_markup_percentage) < 0) {
+      res.status(400).json({ error: 'نسبة هامش الربح غير صالحة.' });
+      return;
     }
-
-    res.json({
-      success: true,
-      booking_reference: finalOrder.booking_reference,
-      payment_status: finalOrder.payment_status,
-      tickets: idx !== -1 ? orders[idx].tickets : tickets
-    });
-
+    appSettings.office_markup_percentage = Number(office_markup_percentage);
+    res.json({ success: true, settings: appSettings });
   } catch (err: unknown) {
-    console.error('Duffel Admin Confirm Pay Error:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message || 'فشلت عملية التأكيد على نظام دافيل.',
-      code: error.code || 'payment_failed',
-      title: error.title || 'Error'
-    });
-  }
-});
-
-/**
- * 16. GET /api/orders/:order_id/refresh -> GET /air/orders/:order_id
- */
-app.get('/api/orders/:order_id/refresh', async (req, res) => {
-  try {
-    const { order_id } = req.params;
-    const duffelResponse = await fetchDuffel(`/air/orders/${order_id}`);
-    const duffelOrder = (duffelResponse['data'] || {}) as DuffelOrderResponse;
-
-    // Update in-memory order details if found
-    const idx = orders.findIndex(o => o.id === order_id);
-    if (idx !== -1) {
-      orders[idx].total_amount = duffelOrder.total_amount;
-      orders[idx].total_currency = duffelOrder.total_currency;
-      orders[idx].payment_status = duffelOrder.payment_status;
-      orders[idx].payment_required_by = duffelOrder.payment_required_by;
-      if (duffelOrder.payment_status === 'paid' && orders[idx].status === 'awaiting_payment') {
-        orders[idx].status = 'confirmed';
-        orders[idx].admin_review_status = 'approved';
-      }
-    }
-
-    res.json(duffelOrder);
-  } catch (err: unknown) {
-    console.error('Duffel Order Refresh Error:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message,
-      code: error.code
-    });
-  }
-});
-
-/**
- * 17. POST /api/orders/:order_id/pay -> POST /air/payments with balance
- */
-app.post('/api/orders/:order_id/pay', async (req, res) => {
-  try {
-    const { order_id } = req.params;
-
-    // 1. Get latest price from Duffel
-    const getOrderResponse = await fetchDuffel(`/air/orders/${order_id}`);
-    const latestOrder = (getOrderResponse['data'] || {}) as DuffelOrderResponse;
-
-    const total_amount = latestOrder.total_amount;
-    const total_currency = latestOrder.total_currency;
-
-    // 2. Call Duffel payments
-    const payload = {
-      data: {
-        order_id,
-        payment: {
-          type: 'balance',
-          amount: total_amount,
-          currency: total_currency
-        }
-      }
-    };
-
-    await fetchDuffel('/air/payments', {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-
-    // 3. Update local order status to confirmed and fetch ticket numbers
-    const updatedOrderResponse = await fetchDuffel(`/air/orders/${order_id}`);
-    const finalOrder = (updatedOrderResponse['data'] || {}) as DuffelOrderResponse;
-
-    const idx = orders.findIndex(o => o.id === order_id);
-    const tickets: Record<string, string>[] = [];
-    if (idx !== -1) {
-      orders[idx].status = 'confirmed';
-      orders[idx].payment_status = finalOrder.payment_status || 'paid';
-      orders[idx].booking_reference = finalOrder.booking_reference;
-      orders[idx].admin_review_status = 'approved';
-      
-      // Try to extract ticket details if any are present
-      if (finalOrder.passengers) {
-        finalOrder.passengers.forEach((p: DuffelPassengerRaw) => {
-          if (p.ticket) {
-            tickets.push({
-              passenger_name: `${p.given_name} ${p.family_name}`,
-              ticket_number: p.ticket.ticket_number
-            });
-          } else if (p.tickets && Array.isArray(p.tickets)) {
-            p.tickets.forEach((t: { ticket_number: string }) => {
-              tickets.push({
-                passenger_name: `${p.given_name} ${p.family_name}`,
-                ticket_number: t.ticket_number
-              });
-            });
-          }
-        });
-      }
-      orders[idx].tickets = tickets.length > 0 ? tickets : [{ passenger_name: 'جميع الركاب', ticket_number: 'ETKT-' + Math.floor(Math.random() * 1000000000000) }];
-    }
-
-    res.json({
-      success: true,
-      booking_reference: finalOrder.booking_reference,
-      payment_status: finalOrder.payment_status,
-      tickets: idx !== -1 ? orders[idx].tickets : tickets
-    });
-
-  } catch (err: unknown) {
-    console.error('Duffel Pay Order Error:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message,
-      code: error.code || 'payment_failed',
-      title: error.title || 'Error'
-    });
-  }
-});
-
-/**
- * 18. POST /api/orders/:order_id/cancel -> POST /air/order_cancellations
- */
-app.post('/api/orders/:order_id/cancel', async (req, res) => {
-  try {
-    const { order_id } = req.params;
-
-    // Create order cancellation
-    const cancelPayload = {
-      data: {
-        order_id
-      }
-    };
-
-    const cancelResponse = await fetchDuffel('/air/order_cancellations', {
-      method: 'POST',
-      body: JSON.stringify(cancelPayload)
-    });
-
-    const cancellation = (cancelResponse['data'] || {}) as DuffelCancellationResponse;
-    const cancellationId = cancellation.id;
-
-    // Confirm order cancellation
-    const confirmResponse = await fetchDuffel(`/air/order_cancellations/${cancellationId}/actions/confirm`, {
-      method: 'POST',
-      body: JSON.stringify({})
-    });
-
-    // Update in-memory order
-    const idx = orders.findIndex(o => o.id === order_id);
-    if (idx !== -1) {
-      orders[idx].status = 'cancelled';
-    }
-
-    res.json({
-      success: true,
-      message: 'تم إلغاء الطلب بنجاح.',
-      cancellation: confirmResponse['data']
-    });
-  } catch (err: unknown) {
-    console.error('Duffel Cancel Order Error:', err);
-    const error = err as DuffelError;
-    res.status(error.status || 500).json({
-      error: error.message,
-      code: error.code
-    });
+    console.error('Error saving settings:', err);
+    res.status(500).json({ error: 'فشل حفظ الإعدادات.' });
   }
 });
 

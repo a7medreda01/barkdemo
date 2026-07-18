@@ -4,6 +4,10 @@ import { CommonModule } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
 import { Router, ActivatedRoute } from '@angular/router';
 import { AirportSelectComponent } from './airport-select';
+import { BookingModalComponent } from './booking-modal/booking-modal';
+import { BookingsListComponent } from './bookings-list/bookings-list';
+import { WalletPanelComponent } from './wallet-panel/wallet-panel';
+import { AdminPanelComponent } from './admin-panel/admin-panel';
 
 export interface User {
   id: string;
@@ -98,7 +102,7 @@ export interface DuffelOrder {
   user_id?: string;
   receipt_number?: string;
   receipt_img?: string;
-  admin_review_status?: 'pending_receipt' | 'pending_approval' | 'approved' | 'rejected';
+  admin_review_status?: 'pending_receipt' | 'pending_approval' | 'approved' | 'rejected' | 'booking_in_progress' | 'completed';
   is_hold_booking?: boolean;
   owner_logo?: string;
   slices?: DuffelSlice[];
@@ -108,6 +112,9 @@ export interface DuffelOrder {
   markup_percentage_at_booking?: number;
   office_markup_amount?: number;
   office_total_amount?: number;
+  duffel_amount?: number;
+  platform_markup?: number;
+  office_markup?: number;
   conditions?: {
     refund_before_departure?: { allowed: boolean } | null;
     change_before_departure?: { allowed: boolean } | null;
@@ -123,7 +130,16 @@ export interface DuffelSearchResults {
 @Component({
   changeDetection: ChangeDetectionStrategy.OnPush,
   selector: 'app-root',
-  imports: [CommonModule, ReactiveFormsModule, MatIconModule, AirportSelectComponent],
+  imports: [
+    CommonModule,
+    ReactiveFormsModule,
+    MatIconModule,
+    AirportSelectComponent,
+    BookingModalComponent,
+    BookingsListComponent,
+    WalletPanelComponent,
+    AdminPanelComponent
+  ],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
@@ -202,10 +218,15 @@ export class App implements OnInit {
   registerForm!: FormGroup;
   depositForm!: FormGroup;
   holdReceiptForm!: FormGroup;
+  receiptForm!: FormGroup;
 
   // Selected order for receipt upload
   receiptSelectedOrder = signal<DuffelOrder | null>(null);
   showReceiptModal = signal<boolean>(false);
+  receiptImg = signal<string>('');
+  showDetailsModal = signal<boolean>(false);
+  detailsOrder = signal<DuffelOrder | null>(null);
+  depositReceiptImg = signal<string>('');
 
   // Flight search states
   searchLoading = signal<boolean>(false);
@@ -218,6 +239,13 @@ export class App implements OnInit {
   bookingLoading = signal<boolean>(false);
   bookingError = signal<string | null>(null);
   bookingSuccess = signal<DuffelOrder | null>(null);
+  bookingMethod = signal<'instant' | 'hold'>('instant');
+  modalReceiptNumber = signal<string>('');
+  modalReceiptImg = signal<string>('');
+
+  selectedOfferDuffelAmount = computed(() => Number(this.selectedOffer()?.total_amount || 0));
+  selectedOfferPlatformMarkup = computed(() => Number((this.selectedOfferDuffelAmount() * (this.officeMarkupPercentage() / 100)).toFixed(2)));
+  selectedOfferTotalAmount = computed(() => Number((this.selectedOfferDuffelAmount() + this.selectedOfferPlatformMarkup()).toFixed(2)));
 
   // Admin states
   ordersList = signal<DuffelOrder[]>([]);
@@ -230,6 +258,11 @@ export class App implements OnInit {
   adminPayLoading = signal<boolean>(false);
   adminPayError = signal<string | null>(null);
   adminPaySuccess = signal<DuffelOrder | null>(null);
+
+  // New admin manual booking states
+  adminPnr = signal<string>('');
+  adminTickets = signal<{ passenger_name: string; ticket_number: string }[]>([]);
+  adminActionLoading = signal<boolean>(false);
 
   // Toast / Status banner states
   toastMessage = signal<string | null>(null);
@@ -249,6 +282,7 @@ export class App implements OnInit {
             origin: params['origin'],
             destination: params['destination'],
             departureDate: params['departureDate'],
+            returnDate: params['returnDate'] || '',
             cabinClass: params['cabinClass'] || 'economy',
             passengerCount: Number(params['passengerCount']) || 1
           });
@@ -269,6 +303,7 @@ export class App implements OnInit {
       origin: ['CAI', [Validators.required, Validators.pattern(/^[A-Za-z]{3}$/)]],
       destination: ['JED', [Validators.required, Validators.pattern(/^[A-Za-z]{3}$/)]],
       departureDate: ['2026-08-15', [Validators.required]],
+      returnDate: ['2026-08-22'],
       cabinClass: ['economy', [Validators.required]],
       passengerCount: [1, [Validators.required, Validators.min(1), Validators.max(9)]]
     });
@@ -304,6 +339,10 @@ export class App implements OnInit {
 
     // Hold Receipt Form
     this.holdReceiptForm = this.fb.group({
+      receiptNumber: ['', [Validators.required, Validators.minLength(5)]]
+    });
+
+    this.receiptForm = this.fb.group({
       receiptNumber: ['', [Validators.required, Validators.minLength(5)]]
     });
   }
@@ -513,7 +552,11 @@ export class App implements OnInit {
       const response = await fetch('/api/wallet/deposit', {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ amount, receipt_number: receiptNumber })
+        body: JSON.stringify({
+          amount,
+          receipt_number: receiptNumber,
+          receipt_img: this.depositReceiptImg()
+        })
       });
 
       const data = await response.json() as { success?: boolean; error?: string };
@@ -523,6 +566,7 @@ export class App implements OnInit {
 
       this.showToast('تم إرسال إيصال الإيداع للإدارة بنجاح! سيتم إضافة الرصيد فور المراجعة.', 'success');
       this.depositForm.reset({ amount: 250, receiptNumber: '' });
+      this.depositReceiptImg.set('');
       this.fetchUserData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'فشل عملية الإيداع.';
@@ -530,22 +574,58 @@ export class App implements OnInit {
     }
   }
 
-  // Submit hold booking payment receipt
-  async submitHoldBookingReceipt() {
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        this.showToast('حجم الملف كبير جداً. الحد الأقصى المسموح به هو 5 ميجابايت.', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.receiptImg.set(reader.result as string);
+        this.showToast('تم تحميل صورة الإيصال بنجاح.', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  onDepositFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files[0]) {
+      const file = input.files[0];
+      if (file.size > 5 * 1024 * 1024) {
+        this.showToast('حجم الملف كبير جداً. الحد الأقصى المسموح به هو 5 ميجابايت.', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        this.depositReceiptImg.set(reader.result as string);
+        this.showToast('تم تحميل صورة إيصال الإيداع بنجاح.', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  }
+
+  async submitReceipt() {
     const order = this.receiptSelectedOrder();
     if (!order) return;
 
-    if (this.holdReceiptForm.invalid) {
+    if (this.receiptForm.invalid) {
       this.showToast('الرجاء كتابة رقم إيصال التحويل بشكل صحيح.', 'error');
       return;
     }
 
     try {
-      const { receiptNumber } = this.holdReceiptForm.value as { receiptNumber: string };
+      const { receiptNumber } = this.receiptForm.value as { receiptNumber: string };
       const response = await fetch(`/api/orders/${order.id}/receipt`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ receipt_number: receiptNumber })
+        body: JSON.stringify({
+          receipt_number: receiptNumber,
+          receipt_img: this.receiptImg()
+        })
       });
 
       const data = await response.json() as { success?: boolean; error?: string };
@@ -556,7 +636,8 @@ export class App implements OnInit {
       this.showToast('تم إرسال إيصال سداد الحجز للإدارة بنجاح! سيتم إصدار تذكرتك فور التحقق.', 'success');
       this.showReceiptModal.set(false);
       this.receiptSelectedOrder.set(null);
-      this.holdReceiptForm.reset();
+      this.receiptForm.reset();
+      this.receiptImg.set('');
       this.fetchUserData();
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'فشل إرسال الإيصال.';
@@ -564,10 +645,17 @@ export class App implements OnInit {
     }
   }
 
+  // Submit hold booking payment receipt
+  async submitHoldBookingReceipt() {
+    await this.submitReceipt();
+  }
+
   // Open Receipt Modal
   openReceiptModal(order: DuffelOrder) {
     this.receiptSelectedOrder.set(order);
     this.holdReceiptForm.reset();
+    this.receiptForm.reset();
+    this.receiptImg.set('');
     this.showReceiptModal.set(true);
   }
 
@@ -605,7 +693,13 @@ async fetchAdminOrders() {
     });
     if (!response.ok) throw new Error('فشل جلب طلبات النظام.');
     const data = await response.json() as DuffelOrder[];
-    this.adminOrdersList.set(data);
+    const mapped = data.map(o => ({
+      ...o,
+      duffel_amount: Number(o.base_amount || 0),
+      platform_markup: 0,
+      office_markup: Number(o.office_markup_amount || 0)
+    }));
+    this.adminOrdersList.set(mapped);
   } catch (e: unknown) {
     this.adminOrdersError.set(e instanceof Error ? e.message : 'خطأ');
   } finally {
@@ -736,11 +830,13 @@ swapOriginDestination(): void {
     }
 
     const formValues = this.searchForm.value;
+    const isRoundTrip = this.tripType() === 'roundtrip';
     this.router.navigate(['/search-results'], {
       queryParams: {
         origin: formValues.origin,
         destination: formValues.destination,
         departureDate: formValues.departureDate,
+        returnDate: isRoundTrip ? (formValues.returnDate || undefined) : undefined,
         cabinClass: formValues.cabinClass,
         passengerCount: formValues.passengerCount
       }
@@ -752,6 +848,7 @@ swapOriginDestination(): void {
     const origin = params['origin'] as string;
     const destination = params['destination'] as string;
     const departureDate = params['departureDate'] as string;
+    const returnDate = params['returnDate'] as string | undefined;
     const cabinClass = params['cabinClass'] as string || 'economy';
     const passengerCount = Number(params['passengerCount']) || 1;
 
@@ -767,6 +864,7 @@ swapOriginDestination(): void {
           origin: origin.toUpperCase(),
           destination: destination.toUpperCase(),
           departure_date: departureDate,
+          return_date: returnDate || undefined,
           cabin_class: cabinClass,
           passengers: Array(passengerCount).fill({ type: 'adult' })
         })
@@ -800,7 +898,7 @@ swapOriginDestination(): void {
   }
 
   // 2. Open Booking Modal
-  openBookingModal(offer: DuffelOffer) {
+openBookingModal(offer: DuffelOffer) {
     if (!this.currentUser()) {
       this.showToast('الرجاء تسجيل الدخول أولاً لتتمكن من حجز هذه الرحلة.', 'info');
       this.userView.set('login');
@@ -819,9 +917,25 @@ swapOriginDestination(): void {
     });
     this.bookingError.set(null);
     this.bookingSuccess.set(null);
-    this.showBookingModal.set(true);
+    this.bookingMethod.set('instant');
+    this.modalReceiptNumber.set('');
+    this.modalReceiptImg.set('');
+    this.paymentMethod.set(this.walletSufficient() ? 'wallet' : 'bank'); // 👈 خليه هنا بس
+    this.showBookingModal.set(true); // 👈 وسيبه مرة واحدة بس هنا
   }
+selectPaymentMethod(method: 'wallet' | 'bank') {
+  if (method === 'wallet' && !this.walletSufficient()) return;
+  this.paymentMethod.set(method);
+  this.bookingError.set(null);
+}
 
+submitBookingModal() {
+  if (this.paymentMethod() === 'wallet') {
+    this.confirmInstantBooking();
+  } else {
+    this.confirmHoldBooking();
+  }
+}
   // Close Booking Modal
   closeBookingModal() {
     this.showBookingModal.set(false);
@@ -832,6 +946,11 @@ swapOriginDestination(): void {
   async confirmHoldBooking() {
     if (this.passengerForm.invalid) {
       this.showToast('الرجاء تعبئة بيانات الراكب بشكل صحيح.', 'error');
+      return;
+    }
+
+    if (!this.modalReceiptNumber().trim()) {
+      this.showToast('الرجاء إدخال رقم إيصال التحويل البنكي لتأكيد الحجز المؤقت.', 'error');
       return;
     }
 
@@ -866,7 +985,9 @@ swapOriginDestination(): void {
           }
         ],
         route_summary: route,
-        owner_name: offer.owner?.name || 'طيران شريك'
+        owner_name: offer.owner?.name || 'طيران شريك',
+        receipt_number: this.modalReceiptNumber(),
+        receipt_img: this.modalReceiptImg()
       };
 
       const response = await fetch('/api/orders/hold', {
@@ -901,22 +1022,21 @@ swapOriginDestination(): void {
   }
 
   // 3b. Confirm Instant Booking (POST /api/orders/instant)
-  async confirmInstantBooking() {
-    if (this.passengerForm.invalid) {
-      this.showToast('الرجاء تعبئة بيانات الراكب بشكل صحيح.', 'error');
-      return;
-    }
+async confirmInstantBooking() {
+  if (this.passengerForm.invalid) {
+    this.showToast('الرجاء تعبئة بيانات الراكب بشكل صحيح.', 'error');
+    return;
+  }
 
-    const offer = this.selectedOffer();
-    if (!offer) return;
+  const offer = this.selectedOffer();
+  if (!offer) return;
 
-    // Check user balance locally before starting loading to give instant warning
-    const balance = this.currentUser()?.wallet_balance || 0;
-    const price = Number(offer.total_amount);
-    if (balance < price) {
-      this.showToast(`رصيد المحفظة غير كافٍ لإجراء الحجز المباشر ($${balance.toFixed(2)} USD). يرجى شحن محفظتك أولاً بقيمة $${price.toFixed(2)} USD.`, 'error');
-      return;
-    }
+  const balance = this.currentUser()?.wallet_balance || 0;
+  const price = this.selectedOfferTotalAmount(); // 👈 بدل Number(offer.total_amount)
+  if (balance < price) {
+    this.showToast(`رصيد المحفظة غير كافٍ لإجراء الحجز المباشر ($${balance.toFixed(2)} USD). يرجى شحن محفظتك أولاً بقيمة $${price.toFixed(2)} USD.`, 'error');
+    return;
+  }
 
     this.bookingLoading.set(true);
     this.bookingError.set(null);
@@ -947,7 +1067,7 @@ swapOriginDestination(): void {
         ],
         route_summary: route,
         owner_name: offer.owner?.name || 'طيران شريك',
-        total_amount: offer.total_amount,
+      total_amount: price.toFixed(2), // 👈 السعر شامل الهامش بدل offer.total_amount
         total_currency: offer.total_currency
       };
 
@@ -996,7 +1116,13 @@ swapOriginDestination(): void {
       });
       if (!response.ok) throw new Error('فشل في جلب قائمة الحجوزات الخاصة بك.');
       const data = await response.json() as DuffelOrder[];
-      this.ordersList.set(data);
+      const mapped = data.map(o => ({
+        ...o,
+        duffel_amount: Number(o.base_amount || 0),
+        platform_markup: 0,
+        office_markup: Number(o.office_markup_amount || 0)
+      }));
+      this.ordersList.set(mapped);
     } catch (err: unknown) {
       console.error(err);
       const message = err instanceof Error ? err.message : 'فشل جلب الحجوزات.';
@@ -1164,6 +1290,12 @@ swapOriginDestination(): void {
     return date.toLocaleDateString('ar-EG', { month: 'short', day: 'numeric' });
   }
 
+  toNumber(val: string | number | undefined): number {
+    if (!val) return 0;
+    const parsed = typeof val === 'number' ? val : parseFloat(val);
+    return isNaN(parsed) ? 0 : parsed;
+  }
+
   // Calculates countdown until hold expiry
   getCountdown(expiryStr: string | null): string {
     if (!expiryStr) return 'غير محدد';
@@ -1182,6 +1314,7 @@ swapOriginDestination(): void {
     this.orderDetailsLoading.set(true);
     this.orderDetailsError.set(null);
     this.selectedOrderDetails.set(null);
+    this.detailsOrder.set(null);
     this.userView.set('order-details');
     try {
       const response = await fetch(`/api/orders/${orderId}`, {
@@ -1190,8 +1323,31 @@ swapOriginDestination(): void {
       if (!response.ok) {
         throw new Error('فشل جلب تفاصيل الحجز.');
       }
-      const data = await response.json();
-      this.selectedOrderDetails.set(data);
+      const data = await response.json() as DuffelOrder;
+      const mapped: DuffelOrder = {
+        ...data,
+        duffel_amount: Number(data.base_amount || 0),
+        platform_markup: 0,
+        office_markup: Number(data.office_markup_amount || 0)
+      };
+      this.selectedOrderDetails.set(mapped);
+      this.detailsOrder.set(mapped);
+      this.showDetailsModal.set(true);
+
+      // Pre-fill finalize form for admin review
+      if (mapped) {
+        this.adminPnr.set(mapped.booking_reference || '');
+        const currentTickets = mapped.tickets || [];
+        const mappedPass = (mapped.passengers || []).map((p: any) => {
+          const name = `${p.title?.toUpperCase()}. ${p.given_name} ${p.family_name}`;
+          const existing = currentTickets.find((t: any) => t.passenger_name === name);
+          return {
+            passenger_name: name,
+            ticket_number: existing ? existing.ticket_number : ''
+          };
+        });
+        this.adminTickets.set(mappedPass);
+      }
     } catch (err: unknown) {
       console.error(err);
       const msg = err instanceof Error ? err.message : 'حدث خطأ في جلب تفاصيل الحجز.';
@@ -1199,6 +1355,101 @@ swapOriginDestination(): void {
     } finally {
       this.orderDetailsLoading.set(false);
     }
+  }
+
+  // Accept Order - Moves to booking_in_progress
+  async acceptAdminOrder(orderId: string) {
+    this.adminActionLoading.set(true);
+    try {
+      this.showToast('جاري قبول الطلب وتحديث الحالة إلى جاري الحجز...', 'info');
+      const response = await fetch(`/api/admin/orders/${orderId}/accept`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل قبول طلب الحجز.');
+      this.showToast('تم قبول الطلب وبدء عملية الحجز اليدوي بنجاح!', 'success');
+      await this.viewOrderDetails(orderId);
+      await this.fetchAdminOrders();
+    } catch (err: unknown) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : 'فشل تنفيذ العملية.';
+      this.showToast(msg, 'error');
+    } finally {
+      this.adminActionLoading.set(false);
+    }
+  }
+
+  // Reject Order - Cancels order & triggers refund if applicable
+  async rejectAdminOrder(orderId: string) {
+    if (!confirm('هل أنت متأكد من رفض هذا الطلب وإرجاع المبلغ لمحفظة الوكيل؟')) return;
+    this.adminActionLoading.set(true);
+    try {
+      this.showToast('جاري رفض الطلب وتحرير المقاعد مع إرجاع المبلغ...', 'info');
+      const response = await fetch(`/api/admin/orders/${orderId}/reject`, {
+        method: 'POST',
+        headers: this.getHeaders()
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل رفض طلب الحجز.');
+      this.showToast('تم رفض الحجز وإعادة المبلغ للوكيل بنجاح!', 'info');
+      await this.viewOrderDetails(orderId);
+      await this.fetchAdminOrders();
+    } catch (err: unknown) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : 'فشل تنفيذ العملية.';
+      this.showToast(msg, 'error');
+    } finally {
+      this.adminActionLoading.set(false);
+    }
+  }
+
+  // Finalize Order - Submits PNR and passenger ticket numbers
+  async finalizeAdminOrder(orderId: string) {
+    if (!this.adminPnr().trim()) {
+      this.showToast('الرجاء إدخال رقم مرجع الحجز (PNR).', 'error');
+      return;
+    }
+    const emptyTickets = this.adminTickets().some(t => !t.ticket_number.trim());
+    if (emptyTickets) {
+      this.showToast('الرجاء إدخال أرقام التذاكر لجميع الركاب.', 'error');
+      return;
+    }
+
+    this.adminActionLoading.set(true);
+    try {
+      this.showToast('جاري إصدار وتثبيت التذاكر الإلكترونية على النظام...', 'info');
+      const response = await fetch(`/api/admin/orders/${orderId}/finalize`, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify({
+          booking_reference: this.adminPnr(),
+          tickets: this.adminTickets()
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'فشل تأكيد الحجز النهائي.');
+      this.showToast('🎉 تم تأكيد الحجز النهائي وإصدار التذاكر للعميل بنجاح!', 'success');
+      await this.viewOrderDetails(orderId);
+      await this.fetchAdminOrders();
+    } catch (err: unknown) {
+      console.error(err);
+      const msg = err instanceof Error ? err.message : 'فشل تنفيذ العملية.';
+      this.showToast(msg, 'error');
+    } finally {
+      this.adminActionLoading.set(false);
+    }
+  }
+
+  // Update a single ticket number in the list
+  updateAdminTicketNumber(index: number, val: string) {
+    this.adminTickets.update(list => {
+      const copy = [...list];
+      if (copy[index]) {
+        copy[index] = { ...copy[index], ticket_number: val };
+      }
+      return copy;
+    });
   }
 
   // Download PDF Itinerary / ticket coupon
@@ -1333,5 +1584,35 @@ swapOriginDestination(): void {
 quickFillRoute(route: { code: string }) {
   this.searchForm.get('destination')?.setValue(route.code);
 }
+paymentMethod = signal<'wallet' | 'bank'>('bank');
+
+walletSufficient = computed(() => {
+  const balance = this.currentUser()?.wallet_balance ?? 0;
+  return balance >= this.selectedOfferTotalAmount();
+});
+
+walletBalanceAfterBooking = computed(() => {
+  const balance = this.currentUser()?.wallet_balance ?? 0;
+  return (balance - this.selectedOfferTotalAmount()).toFixed(2);
+});
+onModalFileSelected(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (input.files && input.files[0]) {
+    const file = input.files[0];
+    if (file.size > 5 * 1024 * 1024) {
+      this.showToast('حجم الملف كبير جداً. الحد الأقصى المسموح به هو 5 ميجابايت.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      this.modalReceiptImg.set(reader.result as string);
+      this.showToast('تم تحميل صورة الإيصال بنجاح في النموذج.', 'success');
+    };
+    reader.readAsDataURL(file);
+  }
+  
+  
+}
+
 currentYear = new Date().getFullYear();
 }

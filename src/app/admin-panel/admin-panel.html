@@ -1,0 +1,644 @@
+<!-- ==============================================
+     VIEW C: SYSTEM ADMIN PORTAL (WHEN LOGGED IN & IS ADMIN)
+     ============================================== -->
+@if (app.currentUser() && app.activeTab() === 'admin') {
+
+  @if (app.userView() === 'order-details') {
+    <!-- SHARED ORDER DETAILS VIEWER IN ADMIN DASHBOARD -->
+    <div class="space-y-6 max-w-4xl mx-auto animate-fade-in text-right" id="order-details-view" dir="rtl">
+
+      <div class="flex justify-between items-center bg-white border border-slate-100 p-4 rounded-2xl shadow-sm">
+        <button (click)="app.userView.set('home')" class="flex items-center gap-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 font-extrabold px-4 py-2.5 text-xs sm:text-sm cursor-pointer transition shadow-sm">
+          <mat-icon class="text-sm">arrow_forward</mat-icon>
+          <span>العودة لجدول إدارة الحجوزات</span>
+        </button>
+
+        <span class="text-xs text-slate-400 font-mono">رقم تعريف الطلب: {{ app.selectedOrderDetails()?.id }}</span>
+      </div>
+
+      @if (app.orderDetailsLoading()) {
+        <div class="bg-white border border-slate-100 rounded-3xl p-16 text-center text-slate-400 shadow-sm">
+          <svg class="animate-spin h-8 w-8 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+          <p class="text-xs font-bold mt-3 text-slate-600">جاري تحميل كامل تفاصيل الحجز وتفاصيل الأرباح...</p>
+        </div>
+      } @else if (app.orderDetailsError(); as errorMsg) {
+        <div class="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center text-rose-700 space-y-3 shadow-sm">
+          <mat-icon class="text-4xl">error_outline</mat-icon>
+          <h3 class="text-lg font-black">فشل تحميل تفاصيل الحجز</h3>
+          <p class="text-xs font-sans">{{ errorMsg }}</p>
+          <button (click)="app.userView.set('home')" class="rounded-xl bg-slate-900 text-white font-bold px-4 py-2 text-xs">العودة للرئيسية</button>
+        </div>
+      } @else if (app.selectedOrderDetails(); as order) {
+
+        <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+          <div class="flex items-center gap-4">
+            @if (order.owner_logo) {
+              <img [src]="order.owner_logo" [alt]="order.owner_name" class="h-12 w-12 object-contain rounded-xl bg-slate-50 p-1" referrerpolicy="no-referrer">
+            } @else {
+              <div class="flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-500 animate-pulse">
+                <mat-icon>flight</mat-icon>
+              </div>
+            }
+            <div class="text-right">
+              <div class="flex items-center gap-2 flex-wrap justify-start">
+                <h1 class="text-xl sm:text-2xl font-black text-slate-900 font-sans tracking-wide">Ref: {{ order.booking_reference }}</h1>
+
+                @if (order.status === 'confirmed') {
+                  <span class="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                    مؤكد ومُصدر ✅
+                  </span>
+                } @else if (order.status === 'cancelled') {
+                  <span class="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">
+                    ملغي ومحرر المقاعد ❌
+                  </span>
+                } @else {
+                  <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">
+                    بانتظار سداد التحويل (Hold) ⏳
+                  </span>
+                }
+              </div>
+              <p class="text-xs text-slate-400 mt-1">تاريخ الإنشاء: {{ order.created_at | date:'medium' }} | الناقل الرسمي: <strong class="text-slate-700 font-bold">{{ order.owner_name }}</strong></p>
+            </div>
+          </div>
+
+          <div class="flex gap-2">
+            <button (click)="app.viewOrderDetails(order.id)" class="flex items-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 text-xs transition cursor-pointer" title="تحديث البيانات">
+              <mat-icon class="text-sm">sync</mat-icon>
+              <span>تحديث الحالة</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+          <div class="lg:col-span-2 space-y-6">
+
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4 text-right">
+              <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                <mat-icon class="text-slate-700">navigation</mat-icon>
+                <h3 class="text-base font-black text-slate-900">خط سير الرحلة (Itinerary)</h3>
+              </div>
+
+              @if (order.slices && order.slices.length > 0) {
+                @for (slice of order.slices; track $index) {
+                  <div class="border border-slate-100 rounded-2xl p-4 sm:p-6 bg-slate-50/50 space-y-4">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                      <span>المدة الكلية للقطاع: <strong>{{ app.formatDuration(slice.duration) }}</strong></span>
+                      <span>قطاع طيران رقم {{ $index + 1 }}</span>
+                    </div>
+
+                    <div class="flex justify-between items-center gap-4">
+                      <div class="text-right">
+                        <strong class="text-xl sm:text-2xl font-black text-slate-900 font-sans block">{{ slice.origin?.iata_code }}</strong>
+                        <span class="text-xs text-slate-500 block truncate max-w-[150px]">{{ slice.origin?.name }}</span>
+                      </div>
+
+                      <div class="flex-1 flex flex-col items-center justify-center relative">
+                        <div class="h-0.5 bg-slate-200 w-full relative">
+                          <mat-icon class="text-base text-slate-400 absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">flight</mat-icon>
+                        </div>
+                        <span class="text-[9px] text-slate-400 mt-2">ناقل مباشر دافيل</span>
+                      </div>
+
+                      <div class="text-left">
+                        <strong class="text-xl sm:text-2xl font-black text-slate-900 font-sans block text-left">{{ slice.destination?.iata_code }}</strong>
+                        <span class="text-xs text-slate-500 block truncate max-w-[150px] text-left">{{ slice.destination?.name }}</span>
+                      </div>
+                    </div>
+
+                    @if (slice.segments && slice.segments.length > 0) {
+                      <div class="border-t border-slate-100 pt-4 space-y-3">
+                        <span class="block text-[10px] font-black text-slate-400 uppercase tracking-wider text-right">تفاصيل الرحلة الفرعية:</span>
+                        @for (seg of slice.segments; track $index) {
+                          <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs bg-white rounded-xl p-3 border border-slate-100 gap-2">
+                            <div class="space-y-1 text-right">
+                              <span class="block font-bold text-slate-800">مغادرة: {{ app.formatDate(seg.departing_at) }} - الساعة {{ app.formatTime(seg.departing_at) }}</span>
+                              <span class="block text-slate-500 text-[10px]">الناقل المسوق: {{ seg.marketing_carrier?.name || order.owner_name }}</span>
+                            </div>
+                            <div class="space-y-1 text-left sm:text-left">
+                              <span class="block font-bold text-slate-800">وصول: {{ app.formatDate(seg.arriving_at) }} - الساعة {{ app.formatTime(seg.arriving_at) }}</span>
+                              <span class="block text-slate-500 text-[10px]">الناقل المشغل: {{ seg.operating_carrier?.name || order.owner_name }}</span>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+                  </div>
+                }
+              } @else {
+                <div class="border border-slate-100 rounded-2xl p-4 bg-slate-50 flex items-center gap-3 text-slate-600">
+                  <mat-icon class="text-slate-400">airplane_ticket</mat-icon>
+                  <div class="text-right">
+                    <span class="block font-bold text-sm">{{ order.route }}</span>
+                    <span class="text-xs text-slate-400">حجز معجل من Duffel API</span>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
+              <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                <mat-icon class="text-slate-700">people</mat-icon>
+                <h3 class="text-base font-black text-slate-900">بيانات المسافرين (Passenger Details)</h3>
+              </div>
+
+              <div class="space-y-3 text-right">
+                @for (passenger of order.passengers; track passenger.id) {
+                  <div class="border border-slate-100 rounded-2xl p-4 flex flex-col sm:flex-row justify-between gap-4 bg-slate-50/50">
+                    <div class="space-y-1.5 text-right">
+                      <span class="text-[10px] font-bold text-slate-400">الاسم الكامل للمسافر</span>
+                      <strong class="text-sm text-slate-900 block">{{ passenger.title | uppercase }}. {{ passenger.given_name }} {{ passenger.family_name }}</strong>
+                      @if (passenger.born_on) {
+                        <span class="text-[10px] text-slate-400 block font-sans">تاريخ الميلاد: {{ passenger.born_on }}</span>
+                      }
+                    </div>
+
+                    <div class="space-y-1.5 sm:text-left text-right">
+                      <span class="text-[10px] font-bold text-slate-400 block sm:text-left">معلومات الاتصال بالراكب</span>
+                      <span class="text-xs text-slate-700 block font-sans select-all">{{ passenger.email || 'غير متوفر' }}</span>
+                      <span class="text-xs text-slate-500 block font-sans select-all">{{ passenger.phone_number || 'غير متوفر' }}</span>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
+              <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                <mat-icon class="text-slate-700">local_activity</mat-icon>
+                <h3 class="text-base font-black text-slate-900">أرقام التذاكر الإلكترونية والوثائق</h3>
+              </div>
+
+              @if (order.status === 'confirmed') {
+                <div class="space-y-3 text-right">
+                  <div class="bg-emerald-50 border border-emerald-150 rounded-2xl p-4 flex items-start gap-3 text-emerald-800 text-right">
+                    <mat-icon class="text-emerald-600 mt-0.5 shrink-0">check_circle</mat-icon>
+                    <div>
+                      <span class="block font-black text-xs sm:text-sm">تم إصدار وثائق السفر بنجاح من Duffel V2 API!</span>
+                      <span class="text-[10px] text-emerald-600 block mt-1">تعتبر هذه الوثيقة تذكرة سفر إلكترونية رسمية صالحة للصعود للطائرة مباشرة.</span>
+                    </div>
+                  </div>
+
+                  @if (order.tickets && order.tickets.length > 0) {
+                    @for (t of order.tickets; track t.ticket_number) {
+                      <div class="flex justify-between items-center border border-slate-100 rounded-xl p-4 bg-slate-50 font-mono">
+                        <div class="text-right">
+                          <span class="text-[10px] text-slate-400">المسافر المستفيد</span>
+                          <strong class="text-slate-800 block text-xs font-sans">{{ t.passenger_name }}</strong>
+                        </div>
+                        <div class="text-left font-sans">
+                          <span class="text-[10px] text-slate-400 block text-left">رقم التذكرة الإلكترونية / E-Ticket</span>
+                          <strong class="text-slate-900 block text-sm font-mono tracking-wider select-all">{{ t.ticket_number }}</strong>
+                        </div>
+                      </div>
+                    }
+                  } @else {
+                    <div class="flex justify-between items-center border border-slate-100 rounded-xl p-4 bg-slate-50 font-mono">
+                      <div class="text-right">
+                        <span class="text-[10px] text-slate-400">الراكب الرئيسي</span>
+                        <strong class="text-slate-800 block text-xs font-sans">جميع الركاب</strong>
+                      </div>
+                      <div class="text-left font-sans">
+                        <span class="text-[10px] text-slate-400 block text-left">رقم الحجز والتذكرة الموحد</span>
+                        <strong class="text-slate-900 block text-sm font-mono tracking-wider select-all font-sans">ETKT-DFL{{ order.booking_reference }}</strong>
+                      </div>
+                    </div>
+                  }
+                </div>
+              } @else {
+                <div class="border border-dashed border-slate-200 rounded-2xl p-8 text-center text-slate-400 bg-slate-50/50 space-y-2">
+                  <mat-icon class="text-3xl text-slate-300 animate-pulse">hourglass_empty</mat-icon>
+                  <h4 class="text-sm font-bold text-slate-600">التذاكر الإلكترونية قيد الانتظار</h4>
+                  <p class="text-xs max-w-sm mx-auto text-slate-400 leading-relaxed">سيتم توليد وإصدار أرقام التذاكر الإلكترونية (E-Tickets) فوراً وبشكل تلقائي بمجرد قيام الإدارة بمراجعة الحوالة وتأكيد الدفع.</p>
+                </div>
+              }
+            </div>
+
+          </div>
+
+          <div class="space-y-6">
+
+            <div class="bg-white border-2 border-slate-900 rounded-3xl shadow-md p-6 sm:p-8 space-y-4 relative overflow-hidden" id="markup-pricing-breakdown">
+              <div class="absolute -top-12 -left-12 h-24 w-24 rounded-full bg-amber-500/10 blur-xl"></div>
+
+              <div class="flex items-center gap-2 border-b border-slate-100 pb-3 justify-start">
+                <mat-icon class="text-slate-700">payments</mat-icon>
+                <h3 class="text-base font-black text-slate-900">تفاصيل التسعير والربح</h3>
+              </div>
+
+              <div class="space-y-3 text-xs text-slate-600">
+                <div class="flex justify-between">
+                  <span>السعر الأساسي للرحلة (Base):</span>
+                  <span class="font-sans font-bold">${{ order.base_amount }} {{ order.total_currency }}</span>
+                </div>
+
+                <div class="flex justify-between">
+                  <span>الضرائب والرسوم (Taxes):</span>
+                  <span class="font-sans font-bold">${{ order.tax_amount }} {{ order.total_currency }}</span>
+                </div>
+
+                <div class="flex justify-between border-t border-slate-100 pt-2 text-slate-800 font-extrabold">
+                  <span>صافي تكلفة Duffel المباشرة:</span>
+                  <span class="font-sans">${{ order.total_amount }} {{ order.total_currency }}</span>
+                </div>
+
+                <div class="flex justify-between text-amber-700 bg-amber-50 border border-amber-100 p-2.5 rounded-xl font-extrabold">
+                  <span>هامش ربح المكتب ({{ order.markup_percentage_at_booking }}%):</span>
+                  <span class="font-sans">+${{ order.office_markup_amount }} {{ order.total_currency }}</span>
+                </div>
+
+                <div class="border-t border-slate-200 pt-3 flex justify-between items-end">
+                  <span class="text-xs font-black text-slate-900">إجمالي المطلوب من العميل:</span>
+                  <span class="text-xl font-black text-emerald-600 font-sans tracking-tight">${{ order.office_total_amount }} {{ order.total_currency }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rules & Expiry -->
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4">
+              <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                <mat-icon class="text-slate-700">info_outline</mat-icon>
+                <h3 class="text-base font-black text-slate-900">شروط وقواعد التذكرة</h3>
+              </div>
+
+              <div class="space-y-3 text-xs text-right">
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
+                  <strong class="text-slate-800 font-bold block">سياسة الإلغاء والاسترجاع:</strong>
+                  <span class="text-slate-500 block">
+                    {{ order.conditions?.refund_before_departure?.allowed ? 'قابلة للاسترجاع برسوم إلغاء قبل الإقلاع.' : 'غير قابلة للاسترجاع (Non-refundable) تذكرة سياحية مقيدة.' }}
+                  </span>
+                </div>
+
+                <div class="bg-slate-50 rounded-xl p-3 border border-slate-100 space-y-1">
+                  <strong class="text-slate-800 font-bold block">سياسة تغيير موعد السفر:</strong>
+                  <span class="text-slate-500 block">
+                    {{ order.conditions?.change_before_departure?.allowed ? 'قابلة للتغيير مع دفع رسوم التغيير وفروقات السعر.' : 'تعديل التذاكر خاضع لشروط الناقل الرسمي للرحلة مباشرة.' }}
+                  </span>
+                </div>
+
+                @if (order.status === 'awaiting_payment' && order.payment_required_by) {
+                  <div class="bg-rose-50 border border-rose-150 rounded-xl p-3 text-rose-700 space-y-1 text-center font-bold">
+                    <span class="block text-[10px] text-rose-500 uppercase">الوقت المتبقي لتأكيد الحجز قبل الإلغاء التلقائي:</span>
+                    <span class="font-sans block text-sm">{{ app.getCountdown(order.payment_required_by) }}</span>
+                  </div>
+                }
+              </div>
+            </div>
+
+            <!-- Operations panel on detail page -->
+            <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4 text-right">
+              <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                <mat-icon class="text-slate-700">settings_applications</mat-icon>
+                <h3 class="text-base font-black text-slate-900">العمليات المتاحة للإدارة</h3>
+              </div>
+
+              <div class="flex flex-col gap-2.5">
+                @if (order.status === 'confirmed') {
+                  <div class="bg-emerald-50 text-emerald-800 border border-emerald-150 rounded-2xl p-4 text-center text-xs font-black space-y-1">
+                    <span class="block">✅ تم تأكيد الحجز يدويًا وإصدار التذاكر بنجاح!</span>
+                    <span class="text-[10px] text-slate-500 font-normal">رقم الحجز (PNR): {{ order.booking_reference }}</span>
+                  </div>
+                } @else if (order.status === 'cancelled') {
+                  <div class="bg-rose-50 text-rose-800 border border-rose-150 rounded-2xl p-4 text-center text-xs font-black">
+                    ❌ هذا الطلب مرفوض أو ملغي وتم تحرير جميع المقاعد.
+                  </div>
+                } @else if (order.admin_review_status === 'booking_in_progress') {
+                  <!-- Manual Booking Details Submission Form -->
+                  <div class="border border-blue-100 bg-blue-50/20 rounded-2xl p-4 space-y-4 text-right">
+                    <div class="space-y-1">
+                      <h4 class="text-xs font-black text-blue-900">وضع الحجز اليدوي نشط ✈️</h4>
+                      <p class="text-[10px] text-slate-500 leading-relaxed">قم بالحجز يدويًا في أي مكان، ثم أدخل رقم الـ PNR وأرقام تذاكر الركاب أدناه لإصدارها وتحديث حالة الوكيل فوراً.</p>
+                    </div>
+
+                    <!-- PNR Input -->
+                    <div class="space-y-1.5">
+                      <label class="block text-[11px] font-bold text-slate-600">رقم مرجع الحجز (PNR) *</label>
+                      <input type="text" [value]="app.adminPnr()" (input)="app.adminPnr.set($any($event.target).value)"
+                             placeholder="مثال: XY789K" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold focus:border-amber-500 focus:outline-none transition uppercase">
+                    </div>
+
+                    <!-- Ticket Inputs for each passenger -->
+                    <div class="space-y-3 pt-2 border-t border-slate-100">
+                      <span class="block text-[11px] font-bold text-slate-700">أرقام التذاكر الإلكترونية للركاب *</span>
+                      @for (t of app.adminTickets(); track $index) {
+                        <div class="space-y-1 bg-white p-2.5 rounded-xl border border-slate-100 text-right">
+                          <span class="block text-[10px] text-slate-500 font-bold text-right">{{ t.passenger_name }}</span>
+                          <input type="text" [value]="t.ticket_number" (input)="app.updateAdminTicketNumber($index, $any($event.target).value)"
+                                 placeholder="أدخل رقم التذكرة (مثال: 074-123456789)" class="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold focus:border-amber-500 focus:outline-none transition">
+                        </div>
+                      }
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="space-y-2 pt-2">
+                      <button (click)="app.finalizeAdminOrder(order.id)" [disabled]="app.adminActionLoading() || !app.adminPnr().trim()"
+                              class="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 text-xs flex items-center justify-center gap-1 cursor-pointer transition shadow-sm active:scale-95 disabled:opacity-50">
+                        <mat-icon class="text-sm">check_circle</mat-icon>
+                        <span>تأكيد الحجز النهائي وإرسال التذاكر</span>
+                      </button>
+
+                      <button (click)="app.rejectAdminOrder(order.id)" [disabled]="app.adminActionLoading()"
+                              class="w-full rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2 text-xs flex items-center justify-center gap-1 cursor-pointer transition">
+                        <mat-icon class="text-sm">cancel</mat-icon>
+                        <span>رفض وإلغاء الطلب</span>
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <!-- Awaiting Admin Accept/Reject Action -->
+                  <div class="border border-slate-100 rounded-2xl p-4 bg-slate-50 space-y-4 text-right">
+                    @if (order.receipt_number) {
+                      <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs space-y-1 text-right">
+                        <span class="block font-bold text-amber-800 text-right">إيصال سداد الوكيل المرفوع:</span>
+                        <span class="block text-[10px] text-slate-500">رقم العملية: <strong>{{ order.receipt_number }}</strong></span>
+                      </div>
+                    }
+
+                    <div class="space-y-2">
+                      <button (click)="app.acceptAdminOrder(order.id)" [disabled]="app.adminActionLoading()"
+                              class="w-full rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow transition active:scale-95">
+                        <mat-icon class="text-sm">thumb_up</mat-icon>
+                        <span>قبول الطلب والبدء بالحجز (جاري الحجز)</span>
+                      </button>
+
+                      <button (click)="app.rejectAdminOrder(order.id)" [disabled]="app.adminActionLoading()"
+                              class="w-full rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold py-2 text-xs flex items-center justify-center gap-1.5 cursor-pointer transition">
+                        <mat-icon class="text-sm">thumb_down</mat-icon>
+                        <span>رفض وإلغاء الطلب</span>
+                      </button>
+                    </div>
+                  </div>
+                }
+
+                <div class="border-t border-slate-100 pt-3.5 mt-2.5 space-y-2">
+                  <span class="block text-[10px] font-black text-slate-400 text-right uppercase tracking-wider">مشاركة تفاصيل الرحلة:</span>
+
+                  <button (click)="app.downloadItineraryPDF(order.id)"
+                          [disabled]="app.pdfDownloading()"
+                          class="w-full rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95 disabled:opacity-50">
+                        <mat-icon class="text-sm">picture_as_pdf</mat-icon>
+                        <span>{{ app.pdfDownloading() ? 'جاري تحميل برنامج الرحلة (PDF)...' : 'تحميل وثيقة البرنامج بالتسعير والباركود (PDF)' }}</span>
+                  </button>
+
+                  <button (click)="app.shareViaWhatsApp(order)"
+                          class="w-full rounded-2xl bg-[#25D366] hover:bg-[#20ba5a] text-white font-bold py-3 text-xs flex items-center justify-center gap-2 cursor-pointer shadow transition active:scale-95">
+                    <mat-icon class="text-sm">share</mat-icon>
+                    <span>مشاركة البرنامج عبر WhatsApp</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+      }
+
+    </div>
+  } @else {
+    <!-- DEFAULT DASHBOARD VIEW FOR ADMINS -->
+    <div class="space-y-8 animate-fade-in text-right" id="admin-portal-dashboard">
+
+      <div class="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h1 class="text-xl font-black text-slate-900 font-sans">لوحة تحكم مدير النظام (برق)</h1>
+          <p class="text-xs text-slate-400 mt-1">راجع إيداعات محافظ الوكلاء، طابق إيصالات تحويل حجوزات الطيران المؤقتة، وأصدر التذاكر النهائية للعملاء.</p>
+        </div>
+      </div>
+
+      <!-- Settings and Commission controls -->
+      <div class="bg-amber-500/10 border-2 border-amber-500/20 rounded-3xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-6" id="admin-settings-panel">
+        <div class="space-y-1.5 text-right">
+          <strong class="text-slate-900 text-base font-black block">إدارة نسبة عمولة وضريبة المنصة</strong>
+          <p class="text-xs text-slate-500 leading-relaxed">تتحكم هذه النسبة في زيادة السعر النهائي الممرر لوكلاء السفر عند استعراض عروض Duffel. السعر = (سعر Duffel API) + النسبة المحددة بالأسفل.</p>
+        </div>
+
+        <div class="flex items-center gap-3 w-full md:w-auto shrink-0 justify-end" dir="rtl">
+          <div class="relative max-w-[140px] w-full">
+            <input type="number" [value]="app.officeMarkupPercentage()" (input)="app.officeMarkupPercentage.set($any($event.target).value)"
+                   class="w-full rounded-xl border border-slate-300 bg-white pl-8 pr-4 py-2.5 text-sm font-sans font-black focus:border-amber-500 focus:outline-none transition">
+            <span class="absolute left-3 top-1/2 transform -translate-y-1/2 text-xs font-bold text-slate-600 font-sans">%</span>
+          </div>
+
+          <button (click)="app.saveSettings()" [disabled]="app.settingsSaving()"
+                  class="rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 text-xs flex items-center gap-1 cursor-pointer transition shadow-sm active:scale-95 disabled:opacity-50">
+            <mat-icon class="text-sm">save</mat-icon>
+            <span>{{ app.settingsSaving() ? 'جاري الحفظ...' : 'حفظ النسبة' }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 1. DEPOSITS & WALLET RECONCILIATION -->
+      <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden text-right" id="admin-deposits-card" dir="rtl">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 class="text-base font-black text-slate-900">مراجعة التحويلات البنكية وشحن محافظ الوكلاء (الودائع)</h3>
+            <p class="text-[10px] text-slate-500 mt-1">راجع إيصالات التحويل، طابق رقم العملية مع حسابات البنك، ثم وافق لشحن رصيد الوكيل فوراً.</p>
+          </div>
+          <button (click)="app.fetchAdminDeposits()" class="flex items-center gap-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 text-xs cursor-pointer">
+            <mat-icon class="text-sm">sync</mat-icon>
+            <span>تحديث الإيداعات</span>
+          </button>
+        </div>
+
+        @if (app.adminDepositsLoading() && app.allDepositsList().length === 0) {
+          <div class="p-12 text-center text-slate-400">
+            <svg class="animate-spin h-6 w-6 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-xs font-bold mt-2">جاري استرجاع الحوالات البنكية...</p>
+          </div>
+        } @else if (app.allDepositsList().length === 0) {
+          <div class="p-12 text-center text-slate-400 space-y-2">
+            <mat-icon class="text-3xl text-slate-300">account_balance_wallet</mat-icon>
+            <p class="text-xs font-bold">لا توجد عمليات إيداع بنكي مسجلة في انتظار المراجعة حالياً.</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse text-sm">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
+                  <th class="p-4">اسم ومكتب العميل</th>
+                  <th class="p-4">تاريخ الإرسال</th>
+                  <th class="p-4">رقم إيصال التحويل</th>
+                  <th class="p-4 text-left">المبلغ المطلوب</th>
+                  <th class="p-4 text-center">حالة التحقق</th>
+                  <th class="p-4 text-center">التحكم والإجراء المالي</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                @for (deposit of app.allDepositsList(); track deposit.id) {
+                  <tr class="hover:bg-slate-50/50 transition">
+
+                    <td class="p-4">
+                      <strong class="block text-slate-900">{{ deposit.user_name }}</strong>
+                      <span class="text-[10px] text-slate-400 font-mono">{{ deposit.user_email }}</span>
+                    </td>
+
+                    <td class="p-4 text-slate-500 font-semibold">{{ deposit.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
+
+                    <td class="p-4 font-mono font-black text-slate-800">{{ deposit.receipt_number }}</td>
+
+                    <td class="p-4 text-left font-sans font-black text-emerald-600">${{ deposit.amount.toFixed(2) }} USD</td>
+
+                    <td class="p-4 text-center">
+                      @if (deposit.status === 'approved') {
+                        <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">مقبول ومضاف ✅</span>
+                      } @else if (deposit.status === 'rejected') {
+                        <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">مرفوض ❌</span>
+                      } @else {
+                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100 animate-pulse">بانتظار التحقق والموافقة</span>
+                      }
+                    </td>
+
+                    <td class="p-4 text-center">
+                      @if (deposit.status === 'pending') {
+                        <div class="flex items-center justify-center gap-1.5">
+                          <button (click)="app.approveDeposit(deposit.id)"
+                                  class="flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 text-xs shadow-sm cursor-pointer"
+                                  id="approve-deposit-{{ deposit.id }}">
+                            <mat-icon class="text-xs">done</mat-icon>
+                            <span>قبول وشحن رصيد المحفظة</span>
+                          </button>
+                          <button (click)="app.rejectDeposit(deposit.id)"
+                                  class="flex items-center gap-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold px-3 py-1.5 text-xs cursor-pointer"
+                                  id="reject-deposit-{{ deposit.id }}">
+                            <mat-icon class="text-xs">close</mat-icon>
+                            <span>رفض</span>
+                          </button>
+                        </div>
+                      } @else {
+                        <span class="text-xs text-slate-400 font-medium">- تم اتخاذ القرار -</span>
+                      }
+                    </td>
+
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+      <!-- 2. HOLD BOOKINGS & TICKETS ISSUANCE -->
+      <div class="bg-white border border-slate-100 rounded-3xl shadow-sm overflow-hidden text-right" id="admin-orders-card" dir="rtl">
+        <div class="px-6 py-4 border-b border-slate-100 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h3 class="text-base font-black text-slate-900">مراجعة الحجوزات المؤقتة وإصدار التذاكر الإلكترونية (Duffel Issuance)</h3>
+            <p class="text-[10px] text-slate-500 mt-1">تأكيد حجز العميل المؤقت على خوادم دافيل بمجرد قيام الوكيل السياحي برفع إيصال سداد الحجز.</p>
+          </div>
+          <button (click)="app.fetchAdminOrders()" class="flex items-center gap-1 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold px-3 py-1.5 text-xs cursor-pointer">
+            <mat-icon class="text-sm">sync</mat-icon>
+            <span>تحديث الحجوزات</span>
+          </button>
+        </div>
+
+        @if (app.ordersLoading() && app.adminOrdersList().length === 0) {
+          <div class="p-12 text-center text-slate-400">
+            <svg class="animate-spin h-6 w-6 text-slate-800 mx-auto" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <p class="text-xs font-bold mt-2">جاري تحميل الحجوزات المحلية...</p>
+          </div>
+        } @else if (app.adminOrdersList().length === 0) {
+          <div class="p-12 text-center text-slate-400 space-y-2">
+            <mat-icon class="text-3xl text-slate-300">airplane_ticket</mat-icon>
+            <p class="text-xs font-bold">لا توجد حجوزات مسجلة على النظام حالياً.</p>
+          </div>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="w-full text-right border-collapse text-sm">
+              <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-xs font-bold text-slate-500">
+                  <th class="p-4">المرجع / Ref</th>
+                  <th class="p-4">خط السير والناقل</th>
+                  <th class="p-4 text-left">التكلفة</th>
+                  <th class="p-4">إيصال سداد الحجز المرفوع</th>
+                  <th class="p-4 text-center">مهلة الدفع / Expiry</th>
+                  <th class="p-4 text-center">حالة الحجز</th>
+                  <th class="p-4 text-center">إجراء التأكيد الفوري</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                @for (order of app.adminOrdersList(); track order.id) {
+                  <tr class="hover:bg-slate-50/50 transition">
+
+                    <td class="p-4">
+                      <strong class="block text-slate-900 font-sans tracking-wide text-base font-black">{{ order.booking_reference }}</strong>
+                      <span class="text-[9px] text-slate-400 font-mono">{{ order.id }}</span>
+                    </td>
+
+                    <td class="p-4">
+                      <strong class="block text-slate-800">{{ order.route }}</strong>
+                      <span class="text-[10px] text-slate-500">{{ order.owner_name }}</span>
+                    </td>
+
+                    <td class="p-4 text-left font-sans font-black text-slate-900">
+                      {{ order.total_amount | currency: order.total_currency : 'symbol' : '1.2-2' }}
+                    </td>
+
+                    <td class="p-4">
+                      @if (order.receipt_number) {
+                        <div class="space-y-1">
+                          <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 border border-slate-200">TXN: {{ order.receipt_number }}</span>
+                          <span class="block text-[10px] text-slate-400">إيصال دفع صالح</span>
+                        </div>
+                      } @else {
+                        <span class="text-xs text-slate-400">لم يتم رفع إيصال الدفع للوكيل بعد</span>
+                      }
+                    </td>
+
+                    <td class="p-4 text-center">
+                      @if (order.status === 'awaiting_payment' && order.payment_required_by) {
+                        <span class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-700 border border-amber-100">
+                          {{ app.getCountdown(order.payment_required_by) }}
+                        </span>
+                      } @else {
+                        <span class="text-xs text-slate-400">-</span>
+                      }
+                    </td>
+
+                    <td class="p-4 text-center">
+                      @if (order.status === 'confirmed') {
+                        <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600 border border-emerald-100">مؤكد ومُصدر ✅</span>
+                      } @else if (order.status === 'cancelled') {
+                        <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-600 border border-rose-100">ملغي ❌</span>
+                      } @else if (order.admin_review_status === 'booking_in_progress') {
+                        <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-600 border border-blue-100 animate-pulse">جاري الحجز ⏳</span>
+                      } @else if (order.admin_review_status === 'pending_approval') {
+                        <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700 border border-amber-100">بانتظار المراجعة</span>
+                      } @else {
+                        <span class="inline-flex rounded-full bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-500 border border-slate-100">بانتظار السداد</span>
+                      }
+                    </td>
+
+                    <td class="p-4 text-center">
+                      <div class="flex items-center justify-center gap-1.5">
+                        <button (click)="app.viewOrderDetails(order.id)"
+                                class="flex items-center gap-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-4 py-2 text-xs transition cursor-pointer shadow-sm"
+                                title="مراجعة وتأكيد الحجز يدوياً">
+                          <mat-icon class="text-xs">edit_note</mat-icon>
+                          <span>فتح ومراجعة الطلب</span>
+                        </button>
+                      </div>
+                    </td>
+
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+
+    </div>
+  }
+
+}
