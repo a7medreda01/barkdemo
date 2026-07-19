@@ -631,7 +631,23 @@ app.post('/api/wallet/deposit', (req, res) => {
  * 7. GET /api/admin/deposits
  */
 app.get('/api/admin/deposits', (req, res) => {
-  // Return all deposits for admin review
+  // Reload from disk to ensure admin has the most up-to-date deposits
+  if (fs.existsSync(DEPOSITS_FILE)) {
+    try {
+      const data = fs.readFileSync(DEPOSITS_FILE, 'utf-8');
+      const loaded = JSON.parse(data) as WalletDeposit[];
+      for (const loadedDeposit of loaded) {
+        const index = deposits.findIndex(d => d.id === loadedDeposit.id);
+        if (index === -1) {
+          deposits.push(loadedDeposit);
+        } else {
+          deposits[index] = { ...deposits[index], ...loadedDeposit };
+        }
+      }
+    } catch (fileErr) {
+      console.error('Error reloading admin deposits from disk:', fileErr);
+    }
+  }
   res.json(deposits.sort((a, b) => b.created_at.localeCompare(a.created_at)));
 });
 
@@ -948,9 +964,27 @@ app.post('/api/orders/restore', (req, res) => {
 app.get('/api/orders/:order_id', (req, res) => {
   try {
     const { order_id } = req.params;
-    const localOrder = orders.find(o => o.id === order_id);
+    let localOrder = orders.find(o => o.id === order_id);
+    
+    // Fallback: If not found in memory, try reloading from disk
+    if (!localOrder && fs.existsSync(ORDERS_FILE)) {
+      try {
+        console.log('Order not found in memory. Reloading orders from disk...');
+        const data = fs.readFileSync(ORDERS_FILE, 'utf-8');
+        const loaded = JSON.parse(data) as LocalOrder[];
+        for (const loadedOrder of loaded) {
+          if (!orders.some(o => o.id === loadedOrder.id)) {
+            orders.push(loadedOrder);
+          }
+        }
+        localOrder = orders.find(o => o.id === order_id);
+      } catch (fileErr) {
+        console.error('Error in disk-reload fallback:', fileErr);
+      }
+    }
+
     if (!localOrder) {
-      res.status(404).json({ error: 'الحجز المطلوب غير موجود.' });
+      res.status(404).json({ error: 'الحجز المطلوب غير موجود في النظام.' });
       return;
     }
     res.json(localOrder);
@@ -965,6 +999,24 @@ app.get('/api/orders/:order_id', (req, res) => {
  */
 app.get('/api/admin/orders', (req, res) => {
   try {
+    // Reload from disk to ensure admin has the most up-to-date bookings
+    if (fs.existsSync(ORDERS_FILE)) {
+      try {
+        const data = fs.readFileSync(ORDERS_FILE, 'utf-8');
+        const loaded = JSON.parse(data) as LocalOrder[];
+        for (const loadedOrder of loaded) {
+          const index = orders.findIndex(o => o.id === loadedOrder.id);
+          if (index === -1) {
+            orders.push(loadedOrder);
+          } else {
+            // Update/sync state if disk is newer
+            orders[index] = { ...orders[index], ...loadedOrder };
+          }
+        }
+      } catch (fileErr) {
+        console.error('Error reloading admin orders from disk:', fileErr);
+      }
+    }
     res.json(orders.sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')));
   } catch (err: unknown) {
     console.error('Error fetching admin orders:', err);

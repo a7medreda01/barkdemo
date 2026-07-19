@@ -1377,11 +1377,21 @@ swapOriginDestination(): void {
     this.detailsOrder.set(null);
     this.userView.set('order-details');
     try {
+      console.log('Fetching order details for ID:', orderId);
       const response = await fetch(`/api/orders/${orderId}`, {
         headers: this.getHeaders()
       });
       if (!response.ok) {
-        throw new Error('فشل جلب تفاصيل الحجز.');
+        let serverError = 'فشل جلب تفاصيل الحجز.';
+        try {
+          const errData = await response.json();
+          if (errData && errData.error) {
+            serverError = errData.error;
+          }
+        } catch (e) {
+          // ignore
+        }
+        throw new Error(serverError);
       }
       const data = await response.json() as DuffelOrder;
       const mapped: DuffelOrder = {
@@ -1409,7 +1419,7 @@ swapOriginDestination(): void {
         this.adminTickets.set(mappedPass);
       }
     } catch (err: unknown) {
-      console.error(err);
+      console.error('Error fetching order details:', err);
       const msg = err instanceof Error ? err.message : 'حدث خطأ في جلب تفاصيل الحجز.';
       this.orderDetailsError.set(msg);
     } finally {
