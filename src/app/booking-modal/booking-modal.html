@@ -25,18 +25,14 @@
             </div>
             <h4 class="text-xl font-extrabold text-slate-900">تم حجز وتثبيت الرحلة بنجاح!</h4>
             <p class="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-              @if (app.paymentMethod() === 'wallet') {
-                تم خصم قيمة الحجز من محفظتك وتثبيت المقاعد مع شركة الطيران وإصدار التذاكر الإلكترونية فوراً.
-              } @else {
-                تم حجز وتثبيت المقاعد مع شركة الطيران بنجاح. سيتم مراجعة إيصال التحويل من قبل الإدارة لتأكيد وإصدار التذاكر الإلكترونية خلال دقائق.
-              }
+              تم حجز وتثبيت المقاعد مع شركة الطيران بنجاح. سيتم مراجعة إيصال التحويل من قبل الإدارة لتأكيد وإصدار التذاكر الإلكترونية خلال دقائق.
             </p>
 
             <div class="bg-slate-50 rounded-2xl p-4 text-right space-y-2 border border-slate-100 font-mono text-xs">
               <div class="flex justify-between"><span class="text-slate-500">مرجع الحجز (PNR):</span> <strong class="text-slate-950 text-sm font-black">{{ success.booking_reference }}</strong></div>
               <div class="flex justify-between"><span class="text-slate-500">موقع العرض في Duffel:</span> <span class="text-slate-600 font-sans select-all">{{ success.id }}</span></div>
               <div class="flex justify-between"><span class="text-slate-500">المبلغ الإجمالي المحمي:</span> <strong class="text-slate-950">{{ success.total_amount }} {{ success.total_currency }}</strong></div>
-              <div class="flex justify-between"><span class="text-slate-500">الحالة الحالية:</span> <strong class="text-slate-950">{{ app.paymentMethod() === 'wallet' ? 'مؤكد ومصدر' : 'قيد الانتظار والمراجعة' }}</strong></div>
+              <div class="flex justify-between"><span class="text-slate-500">الحالة الحالية:</span> <strong class="text-slate-950">قيد الانتظار والمراجعة</strong></div>
             </div>
 
             <div class="flex justify-center pt-2">
@@ -54,7 +50,7 @@
                 <span class="text-xs font-black text-slate-900">بيانات الرحلة المحددة:</span>
                 <span class="text-xs font-bold text-slate-600">{{ offer.owner?.name }}</span>
               </div>
-
+              
               <div class="space-y-1.5 text-xs text-slate-600">
                 <div class="flex justify-between">
                   <span>خط السير:</span>
@@ -67,86 +63,50 @@
               </div>
             </div>
 
-            <!-- ============ اختيار طريقة الدفع ============ -->
-            <div class="space-y-2" id="payment-method-switch">
-              <span class="block text-xs font-black text-slate-900">طريقة الدفع:</span>
-              <div class="grid grid-cols-2 gap-3">
-
-                <button type="button" (click)="app.selectPaymentMethod('wallet')"
-                        [disabled]="!app.walletSufficient()"
-                        class="rounded-2xl border p-3 text-right transition"
-                        [class.border-amber-500]="app.paymentMethod() === 'wallet'"
-                        [class.bg-amber-50]="app.paymentMethod() === 'wallet'"
-                        [class.border-slate-200]="app.paymentMethod() !== 'wallet'"
-                        [class.opacity-40]="!app.walletSufficient()"
-                        [class.cursor-not-allowed]="!app.walletSufficient()"
-                        [class.cursor-pointer]="app.walletSufficient()">
-                  <div class="flex items-center justify-between">
-                    <mat-icon class="text-slate-700 text-lg">account_balance_wallet</mat-icon>
-                    @if (app.paymentMethod() === 'wallet') {
-                      <mat-icon class="text-amber-600 text-base">check_circle</mat-icon>
-                    }
-                  </div>
-                  <strong class="block text-xs font-black text-slate-900 mt-1">الدفع من المحفظة</strong>
-                  <span class="block text-[10px] text-slate-500 mt-0.5">
-                    @if (app.walletSufficient()) {
-                      الرصيد يكفي — خصم وإصدار فوري
-                    } @else {
-                      الرصيد غير كافٍ
-                    }
-                  </span>
-                </button>
-
-                <button type="button" (click)="app.selectPaymentMethod('bank')"
-                        class="rounded-2xl border p-3 text-right cursor-pointer transition"
-                        [class.border-amber-500]="app.paymentMethod() === 'bank'"
-                        [class.bg-amber-50]="app.paymentMethod() === 'bank'"
-                        [class.border-slate-200]="app.paymentMethod() !== 'bank'">
-                  <div class="flex items-center justify-between">
-                    <mat-icon class="text-slate-700 text-lg">account_balance</mat-icon>
-                    @if (app.paymentMethod() === 'bank') {
-                      <mat-icon class="text-amber-600 text-base">check_circle</mat-icon>
-                    }
-                  </div>
-                  <strong class="block text-xs font-black text-slate-900 mt-1">تحويل بنكي</strong>
-                  <span class="block text-[10px] text-slate-500 mt-0.5">إرفاق إيصال ومراجعة الإدارة</span>
-                </button>
-
+            <!-- Payment Method Selector -->
+            @if (app.hasSufficientWalletBalance()) {
+              <div class="space-y-2" id="payment-method-selector">
+                <span class="block text-xs font-black text-slate-900">طريقة الدفع المطلوبة:</span>
+                <div class="grid grid-cols-2 gap-3">
+                  <button type="button" (click)="app.bookingMethod.set('instant')"
+                          [class]="app.bookingMethod() === 'instant' 
+                            ? 'flex items-center justify-center gap-2 rounded-xl border-2 border-emerald-500 bg-emerald-50 px-3 py-3 text-xs font-black text-emerald-900 cursor-pointer transition'
+                            : 'flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition'">
+                    <mat-icon [class]="app.bookingMethod() === 'instant' ? 'text-emerald-600' : 'text-slate-400'">account_balance_wallet</mat-icon>
+                    <span>الدفع من المحفظة</span>
+                  </button>
+                  <button type="button" (click)="app.bookingMethod.set('hold')"
+                          [class]="app.bookingMethod() === 'hold' 
+                            ? 'flex items-center justify-center gap-2 rounded-xl border-2 border-amber-500 bg-amber-50 px-3 py-3 text-xs font-black text-amber-900 cursor-pointer transition'
+                            : 'flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs font-bold text-slate-700 hover:bg-slate-100 cursor-pointer transition'">
+                    <mat-icon [class]="app.bookingMethod() === 'hold' ? 'text-amber-600' : 'text-slate-400'">payment</mat-icon>
+                    <span>تحويل بنكي</span>
+                  </button>
+                </div>
               </div>
-            </div>
-
-            <!-- ============ بطاقة الدفع من المحفظة ============ -->
-            @if (app.paymentMethod() === 'wallet') {
-              <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 text-right space-y-1.5" id="wallet-pay-card">
-                <div class="flex items-center gap-2 text-emerald-700">
-                  <mat-icon class="text-emerald-600">account_balance_wallet</mat-icon>
-                  <strong class="text-sm font-black">سيتم الخصم من رصيد محفظتك مباشرة</strong>
-                </div>
-                <div class="flex justify-between text-xs">
-                  <span class="text-slate-500">الرصيد الحالي:</span>
-                  <strong class="font-sans text-slate-900">${{ app.currentUser()?.wallet_balance?.toFixed(2) }}</strong>
-                </div>
-                <div class="flex justify-between text-xs">
-                  <span class="text-slate-500">قيمة الحجز:</span>
-                  <strong class="font-sans text-slate-900">${{ app.selectedOfferTotalAmount() }}</strong>
-                </div>
-                <div class="flex justify-between text-xs border-t border-emerald-100 pt-1.5">
-                  <span class="text-slate-500">الرصيد بعد الحجز:</span>
-                  <strong class="font-sans text-emerald-700">${{ app.walletBalanceAfterBooking() }}</strong>
+            } @else {
+              <!-- Wallet is not enough, show info badge and default to Bank Transfer -->
+              <div class="rounded-xl border border-blue-150 bg-blue-50/50 p-3 text-right flex items-start gap-2.5" id="wallet-insufficient-info">
+                <mat-icon class="text-blue-500 text-sm mt-0.5">info</mat-icon>
+                <div class="space-y-1">
+                  <span class="block text-[11px] font-black text-blue-900">الدفع عبر تحويل بنكي</span>
+                  <p class="text-[10px] text-blue-700 leading-relaxed">
+                    رصيدك الحالي في المحفظة (<strong class="font-sans">${{ app.currentUser()?.wallet_balance }} USD</strong>) لا يغطي تكلفة الرحلة. تم اختيار الدفع عبر تحويل بنكي تلقائياً.
+                  </p>
                 </div>
               </div>
             }
 
-            <!-- Platform Bank Account Details (فقط لو تحويل بنكي) -->
-            @if (app.paymentMethod() === 'bank') {
+            @if (app.bookingMethod() === 'hold') {
+              <!-- Platform Bank Account Details -->
               <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-right space-y-2.5" id="bank-details-card">
                 <div class="flex items-center gap-2 text-amber-800">
                   <mat-icon class="text-amber-600">account_balance</mat-icon>
                   <strong class="text-sm font-black">تفاصيل الحساب البنكي للمنصة (برق)</strong>
                 </div>
                 <p class="text-xs text-slate-600 leading-relaxed">
-                  يرجى تحويل قيمة الرحلة الكلية
-                  <strong class="text-teal-600 font-sans text-sm">${{ app.selectedOfferTotalAmount() }} USD</strong>
+                  يرجى تحويل قيمة الرحلة الكلية 
+                  <strong class="text-teal-600 font-sans text-sm">${{ app.selectedOfferTotalAmount() }} USD</strong> 
                   إلى الحساب أدناه، ثم كتابة رقم التحويل وإرفاق الإيصال لإتمام الحجز وتثبيته فوراً:
                 </p>
                 <div class="bg-white rounded-xl p-3 border border-slate-100 text-xs space-y-2 font-mono">
@@ -168,6 +128,17 @@
                   </div>
                 </div>
               </div>
+            } @else if (app.bookingMethod() === 'instant') {
+              <!-- Wallet payment notification -->
+              <div class="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-right flex items-start gap-2.5" id="wallet-deduction-info">
+                <mat-icon class="text-emerald-600 mt-0.5">check_circle</mat-icon>
+                <div class="space-y-1">
+                  <span class="block text-xs font-black text-emerald-900">سداد فوري ومباشر من المحفظة</span>
+                  <p class="text-xs text-slate-600 leading-relaxed">
+                    رصيدك الحالي في المحفظة (<strong class="font-sans">${{ app.currentUser()?.wallet_balance }} USD</strong>) يغطي تكلفة الرحلة. عند الضغط على زر الدفع، سيتم خصم <strong class="text-emerald-700 font-sans font-black">${{ app.selectedOfferTotalAmount() }} USD</strong> فوراً وسيتم إصدار التذاكر الفورية.
+                  </p>
+                </div>
+              </div>
             }
           }
 
@@ -175,7 +146,7 @@
 
             <div class="border-t border-slate-150 pt-3">
               <span class="text-xs font-black text-slate-900 block mb-3">بيانات المسافر الرئيسي (بالأحرف الإنجليزية):</span>
-
+              
               <div class="grid grid-cols-2 gap-4">
                 <div class="space-y-1.5">
                   <span class="block text-xs font-bold text-slate-500">اللقب</span>
@@ -222,8 +193,8 @@
               </div>
             </div>
 
-            <!-- Receipt Fields — فقط لو تحويل بنكي -->
-            @if (app.paymentMethod() === 'bank') {
+            <!-- Receipt Integrated Upload Directly Here! -->
+            @if (app.bookingMethod() === 'hold') {
               <div class="border-t border-slate-150 pt-4 space-y-4">
                 <span class="text-xs font-black text-slate-900 block">إثبات الدفع والتحويل البنكي للمنصة:</span>
 
@@ -236,7 +207,7 @@
 
                   <div class="space-y-2">
                     <span class="block text-xs font-black text-slate-800">تحميل صورة إيصال الدفع <span class="text-rose-500">*</span></span>
-
+                    
                     <div class="relative border-2 border-dashed border-slate-200 hover:border-amber-400 bg-white rounded-2xl p-4 text-center cursor-pointer transition">
                       <input type="file" (change)="app.onModalFileSelected($event)" accept="image/*" class="absolute inset-0 opacity-0 cursor-pointer">
                       @if (app.modalReceiptImg()) {
@@ -265,18 +236,19 @@
 
             <!-- Submit Button -->
             <div class="pt-2">
-              <button type="button" (click)="app.submitBookingModal()"
-                      [disabled]="app.bookingLoading() || (app.paymentMethod() === 'bank' && !app.modalReceiptNumber().trim())"
-                      class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-4 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/10 transition active:scale-95 disabled:opacity-50">
-                <mat-icon class="text-sm">done_all</mat-icon>
-                <span>
-                  @if (app.paymentMethod() === 'wallet') {
-                    تأكيد الحجز والخصم من المحفظة
-                  } @else {
-                    تأكيد الحجز ورفع إيصال التحويل
-                  }
-                </span>
-              </button>
+              @if (app.bookingMethod() === 'instant') {
+                <button type="button" (click)="app.confirmInstantBooking()" [disabled]="app.bookingLoading()"
+                        class="w-full rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black py-4 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-emerald-600/10 transition active:scale-95 disabled:opacity-50">
+                  <mat-icon class="text-sm">account_balance_wallet</mat-icon>
+                  <span>الدفع الفوري وإصدار التذاكر من المحفظة</span>
+                </button>
+              } @else {
+                <button type="button" (click)="app.confirmHoldBooking()" [disabled]="app.bookingLoading() || !app.modalReceiptNumber().trim()"
+                        class="w-full rounded-2xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-black py-4 text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-amber-500/10 transition active:scale-95 disabled:opacity-50">
+                  <mat-icon class="text-sm">done_all</mat-icon>
+                  <span>تأكيد الحجز ورفع إيصال التحويل</span>
+                </button>
+              }
 
               @if (app.bookingLoading()) {
                 <div class="flex items-center justify-center gap-2 text-xs font-semibold text-slate-500 pt-3">

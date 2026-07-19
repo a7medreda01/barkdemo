@@ -13,5 +13,4 @@ import { App } from '../app';
 })
 export class BookingModalComponent {
   app = inject(App);
-  
 }

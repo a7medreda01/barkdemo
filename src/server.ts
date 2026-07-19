@@ -15,8 +15,9 @@ const browserDistFolder = join(import.meta.dirname, '../browser');
 const app = express();
 const angularApp = new AngularNodeAppEngine();
 
-// Parse JSON request bodies
-app.use(express.json());
+// Parse JSON request bodies with larger limits to support base64 images
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // In-memory model interfaces
 interface User {

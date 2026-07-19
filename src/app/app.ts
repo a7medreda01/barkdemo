@@ -242,10 +242,24 @@ export class App implements OnInit {
   bookingMethod = signal<'instant' | 'hold'>('instant');
   modalReceiptNumber = signal<string>('');
   modalReceiptImg = signal<string>('');
+  zoomReceiptImg = signal<string | null>(null);
+
+  openReceiptDialog(imgUrl: string) {
+    this.zoomReceiptImg.set(imgUrl);
+  }
+
+  closeReceiptDialog() {
+    this.zoomReceiptImg.set(null);
+  }
 
   selectedOfferDuffelAmount = computed(() => Number(this.selectedOffer()?.total_amount || 0));
   selectedOfferPlatformMarkup = computed(() => Number((this.selectedOfferDuffelAmount() * (this.officeMarkupPercentage() / 100)).toFixed(2)));
   selectedOfferTotalAmount = computed(() => Number((this.selectedOfferDuffelAmount() + this.selectedOfferPlatformMarkup()).toFixed(2)));
+  hasSufficientWalletBalance = computed(() => {
+    const balance = Number(this.currentUser()?.wallet_balance || 0);
+    const total = this.selectedOfferTotalAmount();
+    return balance >= total;
+  });
 
   // Admin states
   ordersList = signal<DuffelOrder[]>([]);
@@ -898,7 +912,7 @@ swapOriginDestination(): void {
   }
 
   // 2. Open Booking Modal
-openBookingModal(offer: DuffelOffer) {
+  openBookingModal(offer: DuffelOffer) {
     if (!this.currentUser()) {
       this.showToast('الرجاء تسجيل الدخول أولاً لتتمكن من حجز هذه الرحلة.', 'info');
       this.userView.set('login');
@@ -917,25 +931,19 @@ openBookingModal(offer: DuffelOffer) {
     });
     this.bookingError.set(null);
     this.bookingSuccess.set(null);
-    this.bookingMethod.set('instant');
+    
+    // Check if wallet balance is sufficient for booking
+    if (this.hasSufficientWalletBalance()) {
+      this.bookingMethod.set('instant');
+    } else {
+      this.bookingMethod.set('hold');
+    }
+
     this.modalReceiptNumber.set('');
     this.modalReceiptImg.set('');
-    this.paymentMethod.set(this.walletSufficient() ? 'wallet' : 'bank'); // 👈 خليه هنا بس
-    this.showBookingModal.set(true); // 👈 وسيبه مرة واحدة بس هنا
+    this.showBookingModal.set(true);
   }
-selectPaymentMethod(method: 'wallet' | 'bank') {
-  if (method === 'wallet' && !this.walletSufficient()) return;
-  this.paymentMethod.set(method);
-  this.bookingError.set(null);
-}
 
-submitBookingModal() {
-  if (this.paymentMethod() === 'wallet') {
-    this.confirmInstantBooking();
-  } else {
-    this.confirmHoldBooking();
-  }
-}
   // Close Booking Modal
   closeBookingModal() {
     this.showBookingModal.set(false);
@@ -987,7 +995,9 @@ submitBookingModal() {
         route_summary: route,
         owner_name: offer.owner?.name || 'طيران شريك',
         receipt_number: this.modalReceiptNumber(),
-        receipt_img: this.modalReceiptImg()
+        receipt_img: this.modalReceiptImg(),
+        total_amount: String(this.selectedOfferTotalAmount()),
+        total_currency: offer.total_currency
       };
 
       const response = await fetch('/api/orders/hold', {
@@ -1022,21 +1032,22 @@ submitBookingModal() {
   }
 
   // 3b. Confirm Instant Booking (POST /api/orders/instant)
-async confirmInstantBooking() {
-  if (this.passengerForm.invalid) {
-    this.showToast('الرجاء تعبئة بيانات الراكب بشكل صحيح.', 'error');
-    return;
-  }
+  async confirmInstantBooking() {
+    if (this.passengerForm.invalid) {
+      this.showToast('الرجاء تعبئة بيانات الراكب بشكل صحيح.', 'error');
+      return;
+    }
 
-  const offer = this.selectedOffer();
-  if (!offer) return;
+    const offer = this.selectedOffer();
+    if (!offer) return;
 
-  const balance = this.currentUser()?.wallet_balance || 0;
-  const price = this.selectedOfferTotalAmount(); // 👈 بدل Number(offer.total_amount)
-  if (balance < price) {
-    this.showToast(`رصيد المحفظة غير كافٍ لإجراء الحجز المباشر ($${balance.toFixed(2)} USD). يرجى شحن محفظتك أولاً بقيمة $${price.toFixed(2)} USD.`, 'error');
-    return;
-  }
+    // Check user balance locally before starting loading to give instant warning
+    const balance = this.currentUser()?.wallet_balance || 0;
+    const price = this.selectedOfferTotalAmount();
+    if (balance < price) {
+      this.showToast(`رصيد المحفظة غير كافٍ لإجراء الحجز المباشر ($${balance.toFixed(2)} USD). يرجى شحن محفظتك أولاً بقيمة $${price.toFixed(2)} USD.`, 'error');
+      return;
+    }
 
     this.bookingLoading.set(true);
     this.bookingError.set(null);
@@ -1067,7 +1078,7 @@ async confirmInstantBooking() {
         ],
         route_summary: route,
         owner_name: offer.owner?.name || 'طيران شريك',
-      total_amount: price.toFixed(2), // 👈 السعر شامل الهامش بدل offer.total_amount
+        total_amount: String(price),
         total_currency: offer.total_currency
       };
 
@@ -1584,17 +1595,7 @@ async confirmInstantBooking() {
 quickFillRoute(route: { code: string }) {
   this.searchForm.get('destination')?.setValue(route.code);
 }
-paymentMethod = signal<'wallet' | 'bank'>('bank');
 
-walletSufficient = computed(() => {
-  const balance = this.currentUser()?.wallet_balance ?? 0;
-  return balance >= this.selectedOfferTotalAmount();
-});
-
-walletBalanceAfterBooking = computed(() => {
-  const balance = this.currentUser()?.wallet_balance ?? 0;
-  return (balance - this.selectedOfferTotalAmount()).toFixed(2);
-});
 onModalFileSelected(event: Event) {
   const input = event.target as HTMLInputElement;
   if (input.files && input.files[0]) {
@@ -1610,8 +1611,6 @@ onModalFileSelected(event: Event) {
     };
     reader.readAsDataURL(file);
   }
-  
-  
 }
 
 currentYear = new Date().getFullYear();

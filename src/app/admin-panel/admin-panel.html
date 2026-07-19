@@ -218,6 +218,78 @@
               }
             </div>
 
+            <!-- Payment & Receipt Details -->
+            @if (order.receipt_number || order.receipt_img) {
+              <div class="bg-white border border-slate-100 rounded-3xl shadow-sm p-6 sm:p-8 space-y-4 text-right" id="admin-payment-receipt-card">
+                <div class="flex items-center gap-2 border-b border-slate-50 pb-3 justify-start">
+                  <mat-icon class="text-slate-700">receipt_long</mat-icon>
+                  <h3 class="text-base font-black text-slate-900">إيصال الدفع والتحويل البنكي للمنصة</h3>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+                  <div class="space-y-3">
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-2.5">
+                      <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500">رقم العملية / المرجع:</span>
+                        <strong class="font-mono text-sm text-slate-900 font-bold bg-white px-2 py-1 rounded border border-slate-150 select-all">{{ order.receipt_number || 'غير متوفر' }}</strong>
+                      </div>
+                      <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500">طريقة الدفع المسجلة:</span>
+                        <strong class="text-slate-800 font-bold">{{ order.is_hold_booking ? 'تحويل بنكي للمنصة' : 'دفع فوري من المحفظة' }}</strong>
+                      </div>
+                      <div class="flex justify-between items-center text-xs">
+                        <span class="text-slate-500">حالة المراجعة المالية:</span>
+                        @if (order.admin_review_status === 'pending_approval') {
+                          <span class="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700 border border-amber-100">بانتظار مراجعة الإيصال</span>
+                        } @else if (order.admin_review_status === 'booking_in_progress') {
+                          <span class="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-bold text-blue-600 border border-blue-100">تم قبول الإيصال - جاري إصدار التذاكر</span>
+                        } @else if (order.status === 'confirmed') {
+                          <span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-600 border border-emerald-100">مكتمل ومُصدَر ✅</span>
+                        } @else {
+                          <span class="rounded-full bg-slate-50 px-2 py-0.5 text-[11px] font-bold text-slate-500 border border-slate-100">ملغي أو غير مدفوع</span>
+                        }
+                      </div>
+                    </div>
+
+                    @if (order.is_hold_booking && order.admin_review_status === 'pending_approval') {
+                      <div class="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 text-right space-y-2">
+                        <div class="flex items-center gap-1.5 text-amber-800">
+                          <mat-icon class="text-amber-600 text-sm">gavel</mat-icon>
+                          <strong class="text-xs font-black">قرار مراجعة التحويل البنكي:</strong>
+                        </div>
+                        <p class="text-[11px] text-slate-600 leading-relaxed">يرجى التحقق من وصول مبلغ <strong class="text-teal-600 font-sans font-black">${{ order.office_total_amount }} {{ order.total_currency }}</strong> إلى حساب المنصة البنكي قبل قبول الحجز لبدء عملية إصدار التذاكر يدوياً.</p>
+                      </div>
+                    }
+                  </div>
+
+                  <div class="space-y-2">
+                    <span class="block text-xs font-bold text-slate-500">صورة الإيصال المرفقة:</span>
+                    @if (order.receipt_img && order.receipt_img !== 'default_receipt') {
+                      <div class="relative border border-slate-200 rounded-2xl overflow-hidden bg-slate-50 flex items-center justify-center p-2 group hover:border-slate-300 transition-all">
+                        <img [src]="order.receipt_img" alt="إيصال سداد الحجز" class="max-h-72 w-auto object-contain rounded-xl shadow-sm cursor-zoom-in transition-transform duration-300 group-hover:scale-[1.02]" referrerpolicy="no-referrer" (click)="app.openReceiptDialog(order.receipt_img)">
+                        <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer pointer-events-none">
+                          <div class="bg-white/90 rounded-xl px-3 py-1.5 flex items-center gap-1 text-xs font-black text-slate-900 shadow">
+                            <mat-icon class="text-xs">zoom_in</mat-icon>
+                            <span>تكبير الإيصال</span>
+                          </div>
+                        </div>
+                      </div>
+                    } @else if (order.receipt_img === 'default_receipt') {
+                      <div class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-slate-400 bg-slate-50 flex flex-col items-center justify-center gap-2">
+                        <mat-icon class="text-3xl text-slate-300">receipt</mat-icon>
+                        <span class="text-xs font-bold">إيصال سداد افتراضي (تحويل مؤكد)</span>
+                      </div>
+                    } @else {
+                      <div class="border border-dashed border-slate-200 rounded-2xl p-6 text-center text-rose-400 bg-rose-50/20 flex flex-col items-center justify-center gap-2">
+                        <mat-icon class="text-3xl text-rose-300">broken_image</mat-icon>
+                        <span class="text-xs font-bold text-rose-700">لم يتم إرفاق صورة إيصال لهذا الحجز!</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </div>
+            }
+
           </div>
 
           <div class="space-y-6">
@@ -483,7 +555,16 @@
 
                     <td class="p-4 text-slate-500 font-semibold">{{ deposit.created_at | date: 'yyyy-MM-dd HH:mm' }}</td>
 
-                    <td class="p-4 font-mono font-black text-slate-800">{{ deposit.receipt_number }}</td>
+                    <td class="p-4 font-mono font-black text-slate-800">
+                      <div class="flex items-center gap-1.5">
+                        <span>{{ deposit.receipt_number }}</span>
+                        @if (deposit.receipt_img) {
+                          <button (click)="app.openReceiptDialog(deposit.receipt_img)" class="text-amber-500 hover:text-amber-600 cursor-pointer flex items-center justify-center p-1 rounded-lg hover:bg-slate-100 transition" title="عرض الإيصال">
+                            <mat-icon class="text-sm">image</mat-icon>
+                          </button>
+                        }
+                      </div>
+                    </td>
 
                     <td class="p-4 text-left font-sans font-black text-emerald-600">${{ deposit.amount.toFixed(2) }} USD</td>
 
@@ -587,7 +668,14 @@
                     <td class="p-4">
                       @if (order.receipt_number) {
                         <div class="space-y-1">
-                          <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 border border-slate-200">TXN: {{ order.receipt_number }}</span>
+                          <div class="flex items-center gap-1.5 justify-start">
+                            <span class="inline-flex rounded bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-700 border border-slate-200">TXN: {{ order.receipt_number }}</span>
+                            @if (order.receipt_img) {
+                              <button (click)="app.openReceiptDialog(order.receipt_img)" class="text-amber-500 hover:text-amber-600 cursor-pointer flex items-center justify-center p-0.5 rounded-lg hover:bg-slate-100 transition" title="عرض صورة الإيصال">
+                                <mat-icon class="text-xs">image</mat-icon>
+                              </button>
+                            }
+                          </div>
                           <span class="block text-[10px] text-slate-400">إيصال دفع صالح</span>
                         </div>
                       } @else {

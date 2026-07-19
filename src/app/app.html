@@ -1024,4 +1024,23 @@
   <!-- DYNAMIC BOOKING DIALOG COMPONENT -->
   <app-booking-modal></app-booking-modal>
 
+  <!-- RECEIPT IMAGE ZOOM LIGHTBOX DIALOG -->
+  @if (zoomReceiptImg(); as imgUrl) {
+    <div class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md transition-all duration-300 animate-fade-in" id="receipt-zoom-dialog" (click)="closeReceiptDialog()">
+      <div class="relative max-w-4xl w-full flex flex-col items-center justify-center space-y-4" (click)="$event.stopPropagation()">
+        <!-- Close Button -->
+        <button (click)="closeReceiptDialog()" class="absolute top-0 right-4 sm:right-0 -mt-12 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition cursor-pointer shadow-lg" id="close-zoom-dialog-btn" title="إغلاق">
+          <mat-icon>close</mat-icon>
+        </button>
+
+        <!-- Image Wrapper -->
+        <div class="bg-white rounded-3xl border border-white/15 overflow-hidden shadow-2xl p-2 sm:p-4 max-h-[80vh] flex items-center justify-center">
+          <img [src]="imgUrl" alt="عرض إيصال السداد الموسع" class="max-h-[75vh] w-auto max-w-full object-contain rounded-2xl cursor-default" referrerpolicy="no-referrer">
+        </div>
+
+        <span class="text-xs text-white/60 font-medium">انقر في أي مكان خارج الصورة أو اضغط على (X) للإغلاق</span>
+      </div>
+    </div>
+  }
+
 </div>
