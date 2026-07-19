@@ -1121,21 +1121,70 @@ swapOriginDestination(): void {
     this.ordersLoading.set(true);
     this.ordersError.set(null);
 
+    // Initial load from localStorage so the UI updates immediately!
+    let localOrders: DuffelOrder[] = [];
+    const cached = localStorage.getItem('brq_orders');
+    if (cached) {
+      try {
+        localOrders = JSON.parse(cached) as DuffelOrder[];
+        this.ordersList.set(localOrders);
+      } catch (e) {
+        console.error('Error parsing local storage orders:', e);
+      }
+    }
+
     try {
       const response = await fetch('/api/orders', {
         headers: this.getHeaders()
       });
       if (!response.ok) throw new Error('فشل في جلب قائمة الحجوزات الخاصة بك.');
       const data = await response.json() as DuffelOrder[];
+      
       const mapped = data.map(o => ({
         ...o,
         duffel_amount: Number(o.base_amount || 0),
         platform_markup: 0,
         office_markup: Number(o.office_markup_amount || 0)
       }));
-      this.ordersList.set(mapped);
+
+      // Merge backend and local storage orders
+      const orderMap = new Map<string, DuffelOrder>();
+      
+      // First, put local orders in map
+      localOrders.forEach(o => {
+        orderMap.set(o.id, o);
+      });
+
+      // Then overwrite/add with backend orders (since backend has the latest live status)
+      mapped.forEach(o => {
+        orderMap.set(o.id, o);
+      });
+
+      const merged = Array.from(orderMap.values());
+
+      // Save back to localStorage
+      localStorage.setItem('brq_orders', JSON.stringify(merged));
+      this.ordersList.set(merged);
+
+      // Restore local-only orders back to the backend (in case the server container restarted)
+      const serverIds = new Set(data.map(o => o.id));
+      const localOnlyOrders = localOrders.filter(o => !serverIds.has(o.id));
+      if (localOnlyOrders.length > 0) {
+        fetch('/api/orders/restore', {
+          method: 'POST',
+          headers: this.getHeaders(),
+          body: JSON.stringify({ orders: localOnlyOrders })
+        })
+        .then(res => {
+          if (res.ok) {
+            console.log('Successfully restored local orders to backend');
+          }
+        })
+        .catch(err => console.error('Failed to restore local orders to server:', err));
+      }
     } catch (err: unknown) {
       console.error(err);
+      // Fallback is already loaded from localStorage above
       const message = err instanceof Error ? err.message : 'فشل جلب الحجوزات.';
       this.ordersError.set(message);
     } finally {

@@ -145,6 +145,100 @@ const notifications: Notification[] = [
 
 const orders: LocalOrder[] = [];
 
+const USERS_FILE = join(import.meta.dirname, '../users_db.json');
+const DEPOSITS_FILE = join(import.meta.dirname, '../deposits_db.json');
+const NOTIFICATIONS_FILE = join(import.meta.dirname, '../notifications_db.json');
+const ORDERS_FILE = join(import.meta.dirname, '../orders_db.json');
+
+function saveUsers() {
+  try {
+    fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving users to file:', err);
+  }
+}
+
+function saveDeposits() {
+  try {
+    fs.writeFileSync(DEPOSITS_FILE, JSON.stringify(deposits, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving deposits to file:', err);
+  }
+}
+
+function saveNotifications() {
+  try {
+    fs.writeFileSync(NOTIFICATIONS_FILE, JSON.stringify(notifications, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving notifications to file:', err);
+  }
+}
+
+function saveOrders() {
+  try {
+    fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf-8');
+  } catch (err) {
+    console.error('Error saving orders to file:', err);
+  }
+}
+
+function loadAllData() {
+  try {
+    if (fs.existsSync(USERS_FILE)) {
+      const data = fs.readFileSync(USERS_FILE, 'utf-8');
+      const loaded = JSON.parse(data) as User[];
+      if (loaded.length > 0) {
+        users.length = 0;
+        users.push(...loaded);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading users from file:', err);
+  }
+
+  try {
+    if (fs.existsSync(DEPOSITS_FILE)) {
+      const data = fs.readFileSync(DEPOSITS_FILE, 'utf-8');
+      const loaded = JSON.parse(data) as WalletDeposit[];
+      if (loaded.length > 0) {
+        deposits.length = 0;
+        deposits.push(...loaded);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading deposits from file:', err);
+  }
+
+  try {
+    if (fs.existsSync(NOTIFICATIONS_FILE)) {
+      const data = fs.readFileSync(NOTIFICATIONS_FILE, 'utf-8');
+      const loaded = JSON.parse(data) as Notification[];
+      if (loaded.length > 0) {
+        notifications.length = 0;
+        notifications.push(...loaded);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading notifications from file:', err);
+  }
+
+  try {
+    if (fs.existsSync(ORDERS_FILE)) {
+      const data = fs.readFileSync(ORDERS_FILE, 'utf-8');
+      const loaded = JSON.parse(data) as LocalOrder[];
+      if (loaded.length > 0) {
+        orders.length = 0;
+        orders.push(...loaded);
+      }
+    }
+  } catch (err) {
+    console.error('Error loading orders from file:', err);
+  }
+}
+
+// Initial load on server start
+loadAllData();
+
 // Middleware helper to resolve active user from 'X-User-Id' header
 function getActiveUser(req: express.Request): User {
   const userId = req.headers['x-user-id'] as string;
@@ -403,6 +497,8 @@ app.post('/api/auth/login', (req, res) => {
       read: false,
       created_at: new Date().toISOString()
     });
+    saveUsers();
+    saveNotifications();
   }
 
   res.json({
@@ -446,6 +542,9 @@ app.post('/api/auth/register', (req, res) => {
     created_at: new Date().toISOString()
   });
 
+  saveUsers();
+  saveNotifications();
+
   res.json({
     success: true,
     user
@@ -477,6 +576,7 @@ app.post('/api/user/notifications/:id/read', (req, res) => {
   const notif = notifications.find(n => n.id === id);
   if (notif) {
     notif.read = true;
+    saveNotifications();
   }
   res.json({ success: true });
 });
@@ -517,6 +617,9 @@ app.post('/api/wallet/deposit', (req, res) => {
     read: false,
     created_at: new Date().toISOString()
   });
+
+  saveDeposits();
+  saveNotifications();
 
   res.json({
     success: true,
@@ -565,7 +668,11 @@ app.post('/api/admin/deposits/:id/approve', (req, res) => {
       read: false,
       created_at: new Date().toISOString()
     });
+    saveUsers();
   }
+
+  saveDeposits();
+  saveNotifications();
 
   res.json({ success: true, deposit });
 });
@@ -598,6 +705,9 @@ app.post('/api/admin/deposits/:id/reject', (req, res) => {
     read: false,
     created_at: new Date().toISOString()
   });
+
+  saveDeposits();
+  saveNotifications();
 
   res.json({ success: true, deposit });
 });
@@ -672,6 +782,9 @@ app.post('/api/orders/hold', (req, res) => {
       read: false,
       created_at: new Date().toISOString()
     });
+
+    saveOrders();
+    saveNotifications();
 
     res.json(newOrder);
   } catch (err: unknown) {
@@ -751,6 +864,10 @@ app.post('/api/orders/instant', (req, res) => {
       created_at: new Date().toISOString()
     });
 
+    saveOrders();
+    saveUsers();
+    saveNotifications();
+
     res.json(newOrder);
   } catch (err: unknown) {
     console.error('Error in instant order:', err);
@@ -769,6 +886,59 @@ app.get('/api/orders', (req, res) => {
   } catch (err: unknown) {
     console.error('Error fetching user orders:', err);
     res.status(500).json({ error: 'فشل في جلب قائمة الحجوزات الخاصة بك.' });
+  }
+});
+
+/**
+ * 12c. POST /api/orders/restore -> Restore/Synchronize orders from browser's localStorage
+ */
+app.post('/api/orders/restore', (req, res) => {
+  try {
+    const { orders: clientOrders } = req.body as { orders?: LocalOrder[] };
+    if (!clientOrders || !Array.isArray(clientOrders)) {
+      res.status(400).json({ error: 'البيانات المرسلة غير صالحة.' });
+      return;
+    }
+
+    let updated = false;
+    for (const clientOrder of clientOrders) {
+      if (!clientOrder || !clientOrder.id) continue;
+      
+      const existingIndex = orders.findIndex(o => o.id === clientOrder.id);
+      if (existingIndex === -1) {
+        orders.push(clientOrder);
+        updated = true;
+      } else {
+        // If client order has a receipt or updated status, merge it
+        const serverOrder = orders[existingIndex];
+        if (clientOrder.receipt_number && !serverOrder.receipt_number) {
+          serverOrder.receipt_number = clientOrder.receipt_number;
+          serverOrder.receipt_img = clientOrder.receipt_img;
+          serverOrder.payment_status = clientOrder.payment_status;
+          serverOrder.admin_review_status = clientOrder.admin_review_status;
+          updated = true;
+        }
+        if (clientOrder.status !== serverOrder.status || clientOrder.admin_review_status !== serverOrder.admin_review_status) {
+          // Merge statuses if client is confirmed or has tickets
+          if (clientOrder.status === 'confirmed' && serverOrder.status !== 'confirmed') {
+            serverOrder.status = 'confirmed';
+            serverOrder.tickets = clientOrder.tickets || [];
+            serverOrder.booking_reference = clientOrder.booking_reference;
+            serverOrder.admin_review_status = clientOrder.admin_review_status;
+            updated = true;
+          }
+        }
+      }
+    }
+
+    if (updated) {
+      saveOrders();
+    }
+
+    res.json({ success: true, count: orders.length });
+  } catch (err: unknown) {
+    console.error('Error restoring orders:', err);
+    res.status(500).json({ error: 'فشل مزامنة الحجوزات.' });
   }
 });
 
@@ -837,6 +1007,9 @@ app.post('/api/orders/:order_id/receipt', (req, res) => {
       });
     }
 
+    saveOrders();
+    saveNotifications();
+
     res.json({ success: true, order });
   } catch (err: unknown) {
     console.error('Error uploading receipt:', err);
@@ -878,6 +1051,10 @@ app.post('/api/orders/:order_id/pay', (req, res) => {
         created_at: new Date().toISOString()
       });
     }
+
+    saveOrders();
+    saveUsers();
+    saveNotifications();
 
     res.json({ success: true, order });
   } catch (err: unknown) {
@@ -928,6 +1105,7 @@ app.post('/api/orders/:order_id/cancel', (req, res) => {
           read: false,
           created_at: new Date().toISOString()
         });
+        saveUsers();
       }
     } else if (order.user_id) {
       notifications.push({
@@ -939,6 +1117,9 @@ app.post('/api/orders/:order_id/cancel', (req, res) => {
         created_at: new Date().toISOString()
       });
     }
+
+    saveOrders();
+    saveNotifications();
 
     res.json({ success: true, message: 'تم إلغاء الحجز بنجاح.', order });
   } catch (err: unknown) {
@@ -971,6 +1152,9 @@ app.post('/api/admin/orders/:order_id/accept', (req, res) => {
         created_at: new Date().toISOString()
       });
     }
+
+    saveOrders();
+    saveNotifications();
 
     res.json({ success: true, order });
   } catch (err: unknown) {
@@ -1008,6 +1192,7 @@ app.post('/api/admin/orders/:order_id/reject', (req, res) => {
           read: false,
           created_at: new Date().toISOString()
         });
+        saveUsers();
       }
     } else if (order.user_id) {
       notifications.push({
@@ -1019,6 +1204,9 @@ app.post('/api/admin/orders/:order_id/reject', (req, res) => {
         created_at: new Date().toISOString()
       });
     }
+
+    saveOrders();
+    saveNotifications();
 
     res.json({ success: true, order });
   } catch (err: unknown) {
@@ -1062,6 +1250,9 @@ app.post('/api/admin/orders/:order_id/finalize', (req, res) => {
         created_at: new Date().toISOString()
       });
     }
+
+    saveOrders();
+    saveNotifications();
 
     res.json({ success: true, order });
   } catch (err: unknown) {
